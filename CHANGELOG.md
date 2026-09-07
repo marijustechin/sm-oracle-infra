@@ -2,6 +2,38 @@
 
 ## 2026-09-07
 
+### OCI Serial Console recovery verified by owner — Ready for review
+
+Marijus reports successful end-to-end recovery-access verification on 2026-09-07: created a local OCI console connection using a dedicated RSA key, reached the serial console, and logged in interactively as marijus using the local Linux password. This establishes access independent of normal SSH; no password SSH policy change is implied.
+
+Recorded the human evidence and recovery sequence in docs/server.md, updated README's recovery status, and removed the final recovery-access item and now-complete TODO section 2 without renumbering later sections. Earlier assessment limitations and historical change-log entries remain preserved.
+
+Verification: checked documentation against the supplied report, reviewed the diff, checked relative links/whitespace, and verified preservation of later TODO sections and prior history. No independent agent live verification or server/OCI changes, commit, or push. No credentials recorded. Exact connection commands/identifier and credential custody were not supplied; successful access does not establish repair of every boot/OS failure. Documentation is Ready for review, not Human accepted.
+
+### Human-performed SSH hardening recorded — Human accepted
+
+Recorded the owner's creation of `/etc/ssh/sshd_config.d/90-sokoladas-hardening.conf`: `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PubkeyAuthentication yes`, `X11Forwarding no`, and `AllowTcpForwarding yes`. Owner reports successful `sshd -t` (exit 0), confirmation of intended effective values with `sshd -T`, then SSH service reload. Exact execution times were not supplied.
+
+Human verification: ubuntu key login and passwordless sudo worked before hardening. Root/opc key logins executed cloud-image redirects to ubuntu without shells; their authorized_keys entries were reported to contain forced commands and disabled port/agent/X11 forwarding. After reload, fresh marijus and ubuntu key sessions succeeded, ubuntu retained passwordless sudo, and direct root SSH was rejected.
+
+Decisions: marijus primary administrator; ubuntu retained as tested recovery administrator; opc retained without cleanup. SSH remains on port 22; TCP forwarding intentionally remains enabled for administrative tunneling. Recorded exact configuration and evidence in docs/server.md and decisions in README.md.
+
+Closed the supported TODO section 2 items. Retained its existing OCI console/recovery task: an alternate tested SSH administrator does not establish access when SSH/networking fails. The owner subsequently verified `sudo -l -U marijus` returned `(ALL : ALL) ALL`. Additional context-specific/negative authentication or forwarding tests were not supplied and are not claimed. Historical assessment results remain intact.
+
+Verification: compared documentation with the human report, reviewed the task diff, checked relative links/whitespace and preservation of older history and later TODO sections. No additional live inspection, live changes, OCI/DNS access, commit, or push. This SSH hardening documentation update is Human accepted.
+
+### SSH and access hardening assessment — Ready for review
+
+Read-only SSH inspection on September 7, 14:12:21–14:13:08 UTC (remote clock). Verified marijus login using only publickey; server advertised only publickey for that session. Readable `60-cloudimg-settings.conf` sets `PasswordAuthentication no`; main file disables keyboard-interactive and enables PAM. Root/public-key default comments were not treated as effective configuration. SSH service/socket are active with wildcard IPv4/IPv6 port 22 listeners.
+
+Recorded account/group and readable key metadata, local marijus password-set status, and cloud provisioning intent for ubuntu and opc. The opc cloud-image fragment sets `ssh_redirect_user: true`; actual protected key/redirect behavior remains unverified. Ubuntu fallback and cloud-intended passwordless sudo remain untested. No password-based SSH access was demonstrated or attempted.
+
+Unprivileged `sshd -T` failed on unavailable host keys, `sudo -n -l` required interactive authentication, and unprivileged firewall queries/other-account key traversal were denied. No privilege bypass attempted. Exact read-only human checks and scope limits are recorded in docs/server.md. No effective-policy, firewall, or fallback success is claimed from failed checks.
+
+Updated TODO section 2 context and changed the unconditional password-disable task into a decision after effective-policy verification, since current readable configuration already disables it. Section 2 remains open; no hardening implemented or new hardening decision adopted.
+
+Verification: reviewed the task diff and evidence attribution, relative links, whitespace, and preservation of prior history/later roadmap sections. Only docs/server.md, TODO.md, and CHANGELOG.md updated. No live configuration, user/key/sudo/firewall/service/package changes, OCI/DNS access, commit, or push. Normal read-session audit/access-time effects were not suppressed. Human review is pending.
+
 ### Human-performed base server setup recorded — Human accepted
 
 Recorded the owner's manual changes: generated `en_US.UTF-8` and `lt_LT.UTF-8`, set system `LANG=en_US.UTF-8` and timezone `Europe/Vilnius`, created/enabled a 2 GiB `/swapfile`, added `/swapfile none swap sw 0 0` to `/etc/fstab`, set `vm.swappiness=10` and persisted it in `/etc/sysctl.d/99-swappiness.conf`, then rebooted. Exact execution/reboot times were not supplied.

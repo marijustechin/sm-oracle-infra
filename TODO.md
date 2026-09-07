@@ -8,16 +8,6 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 The six-file documentation baseline and basic secret-handling rules are Human accepted. Operational secret delivery remains open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
-## 2. SSH and access hardening
-
-The September 6 history reports key login and sudo for `marijus`; effective key-only policy remains unverified. Before access-breaking actions, establish recovery and obtain explicit human approval.
-
-- [ ] Record current access methods, administrative privileges, and fallback usability
-- [ ] Establish and document usable OCI console/recovery access before access-breaking changes
-- [ ] Review effective SSH daemon settings, including password and root login
-- [ ] Disable password SSH authentication after recovery preparation and explicit approval
-- [ ] Verify key-only SSH login and intended administrative access after approved changes
-
 ## 3. Network and firewall
 
 - [ ] Verify recorded VCN/subnet/route/gateway setup and record dated results

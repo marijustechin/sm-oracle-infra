@@ -23,7 +23,7 @@ Internet HTTP/HTTPS → chosen DNS hostname → OCI public address
         → NestJS API → PostgreSQL
 ```
 
-Next.js/NestJS and the exact service layout remain provisional. PostgreSQL is the default database direction, containerized if used. Redis is only a possible internal service, not an approved dependency. Node.js/pnpm belong in application build/runtime containers. Public web traffic enters through the reverse proxy; SSH is a separate administrative service. Intended public ports are 22/tcp, 80/tcp, and 443/tcp; internal application/database ports must remain private. Key-based SSH is the intended access policy, not a claim that password authentication is disabled.
+Next.js/NestJS and the exact service layout remain provisional. PostgreSQL is the default database direction, containerized if used. Redis is only a possible internal service, not an approved dependency. Node.js/pnpm belong in application build/runtime containers. Public web traffic enters through the reverse proxy; SSH is a separate administrative service. Intended public ports are 22/tcp, 80/tcp, and 443/tcp; internal application/database ports must remain private. The owner reports verified SSH hardening: public-key authentication enabled, password/keyboard-interactive authentication and direct root login prohibited; evidence is recorded in [docs/server.md](docs/server.md).
 
 ## Decisions and open questions
 
@@ -40,7 +40,9 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Open | Caddy versus Nginx; final frontend/API/database layout | Candidate services are not a final application architecture |
 | Owner decision / recorded 2026-09-07 | 2 GiB swapfile with swappiness 10; system locale `en_US.UTF-8`, timezone `Europe/Vilnius`; retain package-owned login locale behavior | Human changes/evidence and verification limits in [docs/server.md](docs/server.md); no additional host packages needed now, future installation is requirement-driven |
 | Open | Docker storage/networks/volumes, restart/log policies | Resolve before dependent configuration |
-| Open | Docker administration privileges; SSH restrictions; host firewall policy | Conventional rootful Docker-group access effectively grants host-root control |
+| Owner decision / recorded 2026-09-07 | marijus primary administrator; ubuntu tested recovery administrator with passwordless sudo; retain opc | Human-reported key-login and forced-command tests in [docs/server.md](docs/server.md); OCI Serial Console recovery independently tested by the owner on 2026-09-07; evidence in docs/server.md |
+| Owner decision / recorded 2026-09-07 | SSH port 22; no direct root/password/keyboard-interactive login; public keys enabled; X11 disabled; TCP forwarding enabled | TCP forwarding intentionally supports administrative tunneling; human effective-config and fresh-session checks recorded |
+| Open | Docker administration privileges; SSH source/user restrictions; host firewall policy | Conventional rootful Docker-group access effectively grants host-root control |
 | Open | Secret storage, delivery, access, rotation, and recovery | Resolve before deploying services needing secrets; no secrets platform selected |
 | Open | Deployment/build strategy, CI responsibilities, deployment account, rollback | Application repositories and ARM64 build requirements still needed |
 | Open | Audience/access, demo data, outbound email, payment sandbox behavior | Resolve applicable staging constraints before enabling those capabilities |

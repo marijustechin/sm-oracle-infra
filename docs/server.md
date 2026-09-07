@@ -4,6 +4,90 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## OCI Serial Console recovery — verified 2026-09-07 — Ready for review
+
+Source: Marijus's human-performed end-to-end verification on 2026-09-07. A local OCI console connection was created using a dedicated RSA key, the serial console was reached successfully, and interactive login as `marijus` using the local Linux password succeeded.
+
+This establishes a tested recovery access path independent of normal SSH access. Recovery uses the OCI console connection and its dedicated key to reach the serial console, followed by the local Linux account/password for login; it does not require enabling password authentication in sshd. No key material or password is recorded here.
+
+The report establishes the successful access sequence, not a tested repair of every possible boot, OS, or network failure. Exact console connection commands/identifier and credential custody details were not supplied. This documentation update involved no agent server/OCI access or changes.
+
+The final recovery-access item is complete on this human evidence, so TODO section 2 has no remaining items and is removed. This new documentation entry is Ready for review; earlier accepted hardening remains Human accepted.
+
+## Human-performed SSH hardening — recorded 2026-09-07 — Human accepted
+
+Source: Marijus's report of completed hardening and verification. No additional agent live inspection or changes were performed. Exact execution times were not supplied. This later report supersedes the earlier assessment's unresolved authentication/fallback findings where explicitly verified below; the original assessment remains historical evidence.
+
+Human-created `/etc/ssh/sshd_config.d/90-sokoladas-hardening.conf`:
+
+```text
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+X11Forwarding no
+AllowTcpForwarding yes
+```
+
+Before activation, the owner ran `sudo /usr/sbin/sshd -t` successfully (exit 0) and reports that `sudo /usr/sbin/sshd -T` confirmed all six intended effective values. The SSH service was then reloaded. These effective-value checks are the supplied evidence that fragment precedence produced the intended settings; do not infer precedence from the filename alone.
+
+### Human verification and decisions
+
+- Before hardening, ubuntu key-based SSH login and passwordless sudo were tested successfully. Root and opc key logins executed their cloud-image forced commands directing login as ubuntu; neither provided a shell.
+- The owner inspected `/root/.ssh/authorized_keys` and `/home/opc/.ssh/authorized_keys` and reports restrictive forced-command entries disabling port, agent, and X11 forwarding. Exact entries and permissions were not supplied; no key material is recorded here.
+- After reload, new marijus and ubuntu key-based sessions both succeeded, ubuntu retained working passwordless sudo, and direct root SSH login was rejected.
+- Marijus is the primary administrator. Ubuntu is retained as the tested recovery administrative account. Opc is retained with no cleanup currently required; its redirect test was before hardening, not a claimed post-reload test.
+- Direct root SSH, password authentication, and keyboard-interactive authentication are prohibited; public-key authentication remains enabled. X11 forwarding is disabled. TCP forwarding remains enabled intentionally for legitimate administrative SSH tunneling. SSH remains on port 22.
+
+### Remaining limits and recovery boundary
+
+The tested ubuntu path provides an alternative administrative account over SSH, not evidence of recovery when SSH or networking is unavailable. Subsequent human verification on 2026-09-07 established OCI Serial Console login as marijus, independent of normal SSH, as recorded above. The owner subsequently executed `sudo -l -U marijus`, which reported `(ALL : ALL) ALL`, establishing marijus sudo entitlement to run any command as any user/group. No account-specific `sshd -T -C` results, post-reload negative password/keyboard-interactive tests, forwarding exercise, firewall checks, or OCI checks were supplied. Do not infer them from the reported effective settings and successful key sessions.
+
+The hardening implementation, effective-value review, and fresh-session tests are recorded as completed human work. The documentation is Human accepted; the subsequent Serial Console verification recorded above closes the final section 2 recovery task. No broader authorization is implied.
+
+## SSH/access assessment — 2026-09-07 — Ready for review
+
+Read-only SSH inspection as `marijus` at `152.70.25.153`, hostname `sokoladas-demo`; remote timestamps 14:12:21–14:13:08 UTC. No hardening was implemented. The following distinguishes observed files/protocol behavior from unverified effective policy.
+
+### Observed current state
+
+| Area | Evidence and result |
+|---|---|
+| Key login | Client restricted to public-key authentication with the explicit Oracle Ed25519 key, password/keyboard-interactive disabled, strict host-key checking and host-key updates disabled. Verbose SSH reported `Authentications that can continue: publickey` and successful authentication using `publickey`. This establishes this account/source/session, not every account or connection context |
+| Readable SSH configuration | `/etc/ssh/sshd_config` includes `/etc/ssh/sshd_config.d/*.conf`. The directory contained only `60-cloudimg-settings.conf`, with `PasswordAuthentication no`. Both files are root-owned, mode 644; fragment directory mode 755 |
+| Other explicit settings | Main file sets `KbdInteractiveAuthentication no`, `UsePAM yes`, `X11Forwarding yes`, `PrintMotd no`, `AcceptEnv LANG LC_* COLORTERM NO_COLOR`, and the SFTP subsystem |
+| Root/public-key policy and restrictions | `PermitRootLogin prohibit-password`, `PubkeyAuthentication yes`, and `AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2` occur only as comments. No active Match, AllowUsers, AllowGroups, DenyUsers, or DenyGroups directives appeared in the inspected main file/fragment. Commented defaults are not an effective-policy result |
+| Effective configuration limitation | Unprivileged `/usr/sbin/sshd -T` failed: `no hostkeys available -- exiting`. This does not mean the running daemon lacks host keys; the successful handshake proves it has a usable key. No privileged retry was made |
+| Listener/service state | `ssh.service` and `ssh.socket` active/running; socket listens at `0.0.0.0:22` and `[::]:22`, corroborated by `ss -lnt`. No unit drop-ins reported. Service starts `/usr/sbin/sshd -D $SSHD_OPTS`; readable `/etc/default/ssh` has empty `SSHD_OPTS` |
+| marijus | UID 1002, `/home/marijus`, `/bin/bash`; groups marijus/sudo/users. `passwd -S marijus` reports `P` (password set); no password or hash collected. `sudo -n -l` denied with interactive authentication required; actual authorized sudo commands remain unknown |
+| ubuntu | UID 1001, `/home/ubuntu`, `/bin/bash`; groups ubuntu/adm/cdrom/sudo/dip/lxd. Cloud configuration names ubuntu as default user, with `lock_passwd: True` and intended `ALL=(ALL) NOPASSWD:ALL`. These are provisioning settings, not verified current password/sudo state or a tested fallback login |
+| opc | UID 1000, `/home/opc`, `/bin/sh`, only opc group; no processes returned by `ps -u opc -o user,comm`. `/etc/cloud/cloud.cfg.d/99-oracle-compute-user-redirect.cfg` declares default user plus `opc` with `ssh_redirect_user: true`, and identifies itself as cloud-image-build generated/modified. This supports an intended Oracle-image redirect account toward the default ubuntu user; actual authorized-key redirect behavior is unverified |
+| Other accounts | root has UID 0 and `/bin/bash`; `ocarun` is described as Oracle Cloud Agent Runcommand Service User with `/usr/sbin/nologin`. No additional UID-0 account appeared in `getent passwd`. No sudo entitlement is inferred merely from a shell or account name |
+| Key metadata | marijus home 750, `.ssh` 700, `authorized_keys` 600, all owned by marijus; authorized_keys readable, contents not collected. SSH debug identifies `/home/marijus/.ssh/authorized_keys:1` as the accepted key location, with agent-forwarding/port-forwarding/pty/user-rc/x11-forwarding options. `authorized_keys2` absent. These key options alone do not establish effective forwarding policy |
+| Protected metadata | ubuntu/opc homes are each owner-owned mode 750; traversal to their `.ssh`/authorized_keys denied. `/etc/sudoers` root-owned 440; `/etc/sudoers.d` root-owned 750 and listing denied. Root keys and protected account state were not inspected |
+| Cloud root intent | `/etc/cloud/cloud.cfg` has `disable_root: true`, with comments describing redirection to the default user. This is not a verified live root-login prohibition |
+| File provenance | `dpkg-query -S` found no package owner for the opc redirect fragment, SSH cloud-image fragment, or `/home/opc`; no claim that these paths are currently package-managed |
+| Host firewall | Unprivileged `nft list ruleset` and `iptables -S` denied permission. ufw was not found by `command -v`; `/etc/ufw` exists. No conclusion about enabled rules or public exposure; no elevated firewall inspection or OCI inspection performed |
+
+### Findings and access-loss risks
+
+The previously recorded September 6 statement that password SSH had not been disabled does not describe the readable current configuration: the cloud-image fragment disables it and this live marijus session advertised only publickey. The historical report is preserved; when/how that state arose is not established. A local password being set does not prove password-based SSH is possible. No successful password-based SSH access was observed or attempted.
+
+Full effective root policy, authorization-file paths, authentication combinations, and account/source-specific policy remain unverified. The ubuntu account is consistent with the intended fallback administrator, but neither its key login nor current sudo capability was tested. The opc evidence supports a provisioning redirect role, not a proven independent administrator or recovery route.
+
+Potential lockout points include changing/removing the sole tested access path, applying user/group restrictions before confirming fallback access, confusing cloud provisioning intent with current key/sudo state, and changing ports/addresses without accounting for the active SSH socket unit. The readable SSH file explicitly notes lexical fragment ordering and first-value precedence; a later fragment may not override an earlier value. No OCI recovery route has been established by this assessment.
+
+### Unknowns requiring human execution or OCI-side verification
+
+No attempt was made to bypass interactive sudo. Suggested read-only human checks (not executed by the agent):
+
+- `sudo /usr/sbin/sshd -T` for effective parsed defaults, and `sudo /usr/sbin/sshd -T -C user=marijus,addr=<client-ip>,host=<client-hostname>,laddr=10.0.0.52,lport=22` with actual connection values, repeated for ubuntu/opc/root and relevant source contexts. Inspect authentication, root login, authorized-key paths, restrictions, and forwarding settings; parsed disk policy alone does not prove the running daemon loaded the latest files.
+- `sudo -l -U marijus`, `sudo -l -U ubuntu`, `sudo -l -U opc`; review sudoers/includes as needed. `sudo passwd -S root`, `sudo passwd -S ubuntu`, and `sudo passwd -S opc` report lock/password status without exposing hashes.
+- `sudo stat -c '%a %U:%G %n' /root /root/.ssh /root/.ssh/authorized_keys /home/ubuntu/.ssh /home/ubuntu/.ssh/authorized_keys /home/opc/.ssh /home/opc/.ssh/authorized_keys`; adjust locations after effective-policy checks. Privately inspect key restrictions/forced-command redirection for opc and root; report sanitized conclusions rather than key material.
+- `sudo nft list ruleset` and `sudo iptables -S` for host rules; separately verify applicable OCI rules and a usable recovery path. No firewall or recovery capability can be inferred from SSH success alone.
+
+Fallback login usability needs a separately authorized test with the intended credential holder; no ubuntu/opc/root login was attempted. Normal SSH/sudo audit and access-time effects were not suppressed. Permission failures and the failed effective-policy check are recorded limitations, not completed verification. TODO section 2 remains open; hardening decisions require human review.
+
 ## Base server setup — recorded 2026-09-07 — Human accepted
 
 Source: Marijus's report of manually completed changes and post-reboot verification. No independent live inspection was performed for this documentation update; exact execution/reboot times were not supplied. This later report supersedes the earlier no-swap observation for intended/current recorded setup without changing that historical evidence.
@@ -130,8 +214,8 @@ The listed verification commands were `whoami` and `sudo whoami`, without captur
 
 | Area | Recorded limitation / prerequisite |
 |---|---|
-| SSH and accounts | `marijus` SSH access and group membership observed above; noninteractive sudo denied. Effective authentication/root-login policy, full privileges, and fallback usability remain unverified |
-| Recovery | `ubuntu` was retained as fallback, but current usability and OCI console recovery procedure are not established; another account alone does not prove recovery from network/sshd failure |
+| SSH and accounts | Human hardening report confirms the six effective settings, fresh marijus/ubuntu key sessions, ubuntu passwordless sudo, and root rejection; owner subsequently verified marijus sudo entitlement `(ALL : ALL) ALL` using `sudo -l -U marijus`; account-specific SSH policy checks remain unverified |
+| Recovery | Owner tested ubuntu key login/passwordless sudo and, separately, end-to-end OCI Serial Console login as marijus with the local Linux password on 2026-09-07. Serial Console provides recovery access independent of normal SSH; arbitrary OS/boot repair is not claimed |
 | OCI networking | Actual security-list/NSG rules and their attachment/effective exposure have not been recorded |
 | Host / containers | Listeners and negative runtime/package/PATH checks recorded above; firewall rules, dormant/custom workloads, and complete container-installation status remain unverified |
 | DNS / TLS / application | DNS/TLS uninspected; no application workload identified in the point-in-time views above, not an exhaustive deployment audit |
