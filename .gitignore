@@ -1,0 +1,12 @@
+# Local environment secrets; sanitized examples may be tracked.
+.env
+.env.*
+!.env.example
+
+# Private-key filenames (not a substitute for checking the diff).
+*.key
+id_rsa
+id_ed25519
+
+# macOS metadata.
+.DS_Store
