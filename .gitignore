@@ -10,3 +10,6 @@ id_ed25519
 
 # macOS metadata.
 .DS_Store
+
+# Git diff files.
+git.diff

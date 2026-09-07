@@ -8,12 +8,6 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 The six-file documentation baseline and basic secret-handling rules are Human accepted. Operational secret delivery remains open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
-## 0. Scoped baseline verification
-
-- [ ] In an explicitly authorized inspection task, verify current server inventory and record dated evidence/limitations
-- [ ] Establish current workloads and valuable data before changes that could affect them
-- [ ] Confirm acceptable spending and how actual OCI costs/eligibility will be checked
-
 ## 1. Base server setup
 
 - [ ] Configure hostname/timezone/locale if needed

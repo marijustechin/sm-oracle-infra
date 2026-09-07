@@ -2,7 +2,7 @@
 
 Infrastructure and operational context for the `sokoladas.eu` demo/staging environment of the new `sokoladomeistrai` e-commerce application. This is separate from the current production shop.
 
-Read [AGENTS.md](AGENTS.md) before work. The effective team is Marijus, the owner/developer/administrator, assisted by AI agents. The goal is an inexpensive, understandable, secure, ARM64-compatible environment that can be rebuilt without relying on shell history. OCI Free Tier is the cost objective, not a verified assurance of eligibility or zero charges.
+Read [AGENTS.md](AGENTS.md) before work. The effective team is Marijus, the owner/developer/administrator, assisted by AI agents. The goal is an inexpensive, understandable, secure, ARM64-compatible environment that can be rebuilt without relying on shell history. OCI Free Tier is the cost objective. Dated human-observed allowance, volume eligibility, and cost evidence is recorded in [docs/server.md](docs/server.md); it does not guarantee future zero charges.
 
 ## Working method
 
@@ -43,7 +43,7 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Open | Secret storage, delivery, access, rotation, and recovery | Resolve before deploying services needing secrets; no secrets platform selected |
 | Open | Deployment/build strategy, CI responsibilities, deployment account, rollback | Application repositories and ARM64 build requirements still needed |
 | Open | Audience/access, demo data, outbound email, payment sandbox behavior | Resolve applicable staging constraints before enabling those capabilities |
-| Open | Spending limit and cost checks | Free Tier is an objective; current charges/eligibility are not verified here |
+| Open | Spending limit and ongoing cost-check cadence | Initial human Console verification is recorded in [docs/server.md](docs/server.md); no spending limit or recurring cadence has been supplied |
 | Open | Persistent data worth keeping, backups, monitoring, updates | Resolve backups before introducing valuable persistent data |
 | Open | Rebuild scope for OCI resources themselves | Full rebuildability is the goal; starting from a new VM does not yet specify cloud provisioning |
 
