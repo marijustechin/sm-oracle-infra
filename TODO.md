@@ -8,12 +8,6 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 The six-file documentation baseline and basic secret-handling rules are Human accepted. Operational secret delivery remains open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
-## 1. Base server setup
-
-- [ ] Configure hostname/timezone/locale if needed
-- [ ] Decide on swap strategy
-- [ ] Install only minimal host packages
-
 ## 2. SSH and access hardening
 
 The September 6 history reports key login and sudo for `marijus`; effective key-only policy remains unverified. Before access-breaking actions, establish recovery and obtain explicit human approval.

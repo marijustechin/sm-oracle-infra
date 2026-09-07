@@ -38,7 +38,8 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Approved plan / 2026-09-07 | Separate repository/live authorization; explicit approval for destructive/access-breaking actions; lightweight review lifecycle | Remediation plan approved; implementation is Human accepted |
 | Open | Root/www versus demo/API subdomains; dynamic versus reserved public address | Choose before changing DNS; `sokoladas.eu` is the documented available domain |
 | Open | Caddy versus Nginx; final frontend/API/database layout | Candidate services are not a final application architecture |
-| Open | Swap, Docker storage/networks/volumes, restart/log policies | Resolve before dependent configuration |
+| Owner decision / recorded 2026-09-07 | 2 GiB swapfile with swappiness 10; system locale `en_US.UTF-8`, timezone `Europe/Vilnius`; retain package-owned login locale behavior | Human changes/evidence and verification limits in [docs/server.md](docs/server.md); no additional host packages needed now, future installation is requirement-driven |
+| Open | Docker storage/networks/volumes, restart/log policies | Resolve before dependent configuration |
 | Open | Docker administration privileges; SSH restrictions; host firewall policy | Conventional rootful Docker-group access effectively grants host-root control |
 | Open | Secret storage, delivery, access, rotation, and recovery | Resolve before deploying services needing secrets; no secrets platform selected |
 | Open | Deployment/build strategy, CI responsibilities, deployment account, rollback | Application repositories and ARM64 build requirements still needed |

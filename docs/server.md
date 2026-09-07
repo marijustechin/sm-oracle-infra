@@ -4,6 +4,31 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## Base server setup — recorded 2026-09-07 — Human accepted
+
+Source: Marijus's report of manually completed changes and post-reboot verification. No independent live inspection was performed for this documentation update; exact execution/reboot times were not supplied. This later report supersedes the earlier no-swap observation for intended/current recorded setup without changing that historical evidence.
+
+| Setting / decision | Human-reported state and evidence |
+|---|---|
+| Hostname | Earlier live inspection observed `sokoladas-demo`; no hostname change is needed for the current task |
+| Generated locales | `en_US.UTF-8` and `lt_LT.UTF-8` generated; post-reboot `locale -a` contains `en_US.utf8` and `lt_LT.utf8` |
+| System locale | `/etc/default/locale` contains `LANG=en_US.UTF-8`; post-reboot `localectl status` reports the same system locale |
+| Timezone / clock | Set to `Europe/Vilnius`; post-reboot `timedatectl` reports that timezone, synchronized clock, and active NTP |
+| Swap | Created and enabled a 2 GiB `/swapfile`; after reboot, `swapon --show` reports it and `free -h` reports 2 GiB swap |
+| Swap persistence | `/etc/fstab` contains `/swapfile none swap sw 0 0`, confirmed after reboot |
+| Swappiness | Owner reports setting `vm.swappiness=10` and persisting it in `/etc/sysctl.d/99-swappiness.conf`; owner confirms post-reboot `sysctl vm.swappiness` returned `vm.swappiness = 10` |
+| Host packages | Owner confirms no additional packages are currently required; installation is requirement-driven, not an obligation to install packages now |
+
+### Deliberate interactive-login locale behavior
+
+The owner reports that interactive login still yields `LANG=C.UTF-8` and `LC_CTYPE=C.UTF-8`. Their investigation identified `/etc/profile.d/01-locale-fix.sh`, owned by Ubuntu's `base-files` package, executing `locale-check C.UTF-8`. The deliberate decision is to retain this package-owned behavior. The recorded system default and the login-session environment are distinct; do not treat their difference as unfinished locale work or silently modify the package-owned script.
+
+### Reproduction and verification boundary
+
+The table records the selected locales, timezone, swap size/path, fstab entry, and sysctl persistence location/value needed for future setup. Exact historical creation commands, swapfile permissions/allocation method, and a tested bootstrap script were not supplied; no command sequence is represented as tested automation. Human post-reboot checks establish active swap and the reported locale/timezone state. Swappiness application/persistence is a human change report; the owner additionally confirmed that post-reboot `sysctl vm.swappiness` returned `vm.swappiness = 10`.
+
+TODO section 1 can close: hostname already fits, timezone/locale work is reported verified with an accepted behavioral exception, the swap strategy is selected and active after reboot, and no additional package requirement exists. This does not complete SSH hardening or later roadmap work. Any future automation or independent checks require their own scoped task; no live changes were made by the agent.
+
 ## Recorded OCI baseline
 
 | Property | Recorded value |

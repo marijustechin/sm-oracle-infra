@@ -2,6 +2,18 @@
 
 ## 2026-09-07
 
+### Human-performed base server setup recorded — Human accepted
+
+Recorded the owner's manual changes: generated `en_US.UTF-8` and `lt_LT.UTF-8`, set system `LANG=en_US.UTF-8` and timezone `Europe/Vilnius`, created/enabled a 2 GiB `/swapfile`, added `/swapfile none swap sw 0 0` to `/etc/fstab`, set `vm.swappiness=10` and persisted it in `/etc/sysctl.d/99-swappiness.conf`, then rebooted. Exact execution/reboot times were not supplied.
+
+Human post-reboot verification: `timedatectl` reports the chosen timezone, synchronized clock and active NTP; `swapon --show` and `free -h` report 2 GiB swap; fstab contains the swapfile entry; `/etc/default/locale` and `localectl status` report `LANG=en_US.UTF-8`; `locale -a` includes both generated locales.
+
+Decision: retain interactive-login `LANG=C.UTF-8` / `LC_CTYPE=C.UTF-8`. The owner traced this to Ubuntu `base-files`-owned `/etc/profile.d/01-locale-fix.sh` executing `locale-check C.UTF-8` and deliberately chose not to modify it. No additional host packages are required now; future installation remains requirement-driven. The earlier observed hostname `sokoladas-demo` needs no change for this task.
+
+Removed completed TODO section 1 without renumbering later sections. Added the configuration/evidence record to docs/server.md and replaced README's open swap question with the owner's selected direction. Historical no-swap observations and earlier change-log entries remain intact.
+
+Verification and limitations: checked documentation against the supplied report, reviewed the task diff, relative links and whitespace, and confirmed later TODO sections/history were preserved. No independent live inspection or changes were performed. Final human verification: post-reboot `sysctl vm.swappiness` returned `vm.swappiness = 10`. Exact swapfile creation commands/permissions and tested bootstrap automation were not supplied and are not claimed. The original section's swap-strategy decision is resolved; these evidence limits do not create an additional package-installation or locale-fix task. Base server setup and its documentation are Human accepted. No commit or push.
+
 ### Human-observed OCI cost verification recorded — Human accepted
 
 Recorded Marijus's September 7 OCI Console observations in docs/server.md: `sokoladas-demo` uses `VM.Standard.A1.Flex` with 2 OCPUs and 12 GB RAM; the displayed Always Free A1 allowance is 3,000 OCPU-hours and 18,000 GB-hours/month (described as 4 OCPUs and 24 GB RAM). One 47 GB boot volume is marked Always Free, with no additional block volumes in the inspected compartment/region view. Cost Analysis for September 1–7 shows €0.00 Cost To Date and €0.00 each for Compute, Block Storage, and Virtual Cloud Network.
