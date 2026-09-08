@@ -42,7 +42,11 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Open | Docker storage/networks/volumes, restart/log policies | Resolve before dependent configuration |
 | Owner decision / recorded 2026-09-07 | marijus primary administrator; ubuntu tested recovery administrator with passwordless sudo; retain opc | Human-reported key-login and forced-command tests in [docs/server.md](docs/server.md); OCI Serial Console recovery independently tested by the owner on 2026-09-07; evidence in docs/server.md |
 | Owner decision / recorded 2026-09-07 | SSH port 22; no direct root/password/keyboard-interactive login; public keys enabled; X11 disabled; TCP forwarding enabled | TCP forwarding intentionally supports administrative tunneling; human effective-config and fresh-session checks recorded |
-| Open | Docker administration privileges; SSH source/user restrictions; host firewall policy | Conventional rootful Docker-group access effectively grants host-root control |
+| Owner direction / 2026-09-07 | Retain iptables-nft/netfilter-persistent; no additional UFW; preserve InstanceServices | No firewall change needed now; UDP 123 live-rule consistency is human-verified; historical evidence is preserved in docs/server.md |
+| Owner direction / 2026-09-07 | Keep TCP 22 available without a fixed source-IP restriction; do not enable OCI IPv6 | Changing administrator networks; key-only SSH and tested Serial Console. Design IPv6 security before future global addressing |
+| Owner direction / 2026-09-07 | Future web ingress TCP 80/443 only, alongside SSH; keep 111 and application/database ports nonpublic | Do not open web ports before the HTTP deployment needs them; Docker exposure requires separate verification |
+| Human-executed / recorded 2026-09-07 | rpcbind service and socket disabled and masked; packages retained | Owner reports both units masked/inactive, no port-111 listener, and refused local portmapper query; evidence and limitations in docs/server.md |
+| Open | Docker administration privileges; SSH user restrictions | Conventional rootful Docker-group access effectively grants host-root control |
 | Open | Secret storage, delivery, access, rotation, and recovery | Resolve before deploying services needing secrets; no secrets platform selected |
 | Open | Deployment/build strategy, CI responsibilities, deployment account, rollback | Application repositories and ARM64 build requirements still needed |
 | Open | Audience/access, demo data, outbound email, payment sandbox behavior | Resolve applicable staging constraints before enabling those capabilities |
@@ -56,7 +60,7 @@ Possible DNS layouts previously considered are `sokoladas.eu` with `www.sokolada
 
 [docs/server.md](docs/server.md) consolidates the recorded instance/network inventory and historical setup evidence. The original baseline reported a running VM, working SSH/public access, ARM64 and Ubuntu confirmation. The September 6 change log reports creation of `marijus` and retention of `ubuntu` as fallback. These reports have not been reverified during documentation remediation.
 
-Detailed hardening and Docker installation are not established by repository evidence. Absence of scripts or configuration does not prove software is absent on the server.
+The network/firewall baseline (TODO Section 3) is closed **Human accepted** on the recorded agent and human evidence, including final human OCI attachment/statefulness confirmation recorded 2026-09-08. Evidence and verification limits are in [docs/server.md](docs/server.md#section-3-closed-on-human-oci-evidence--recorded-2026-09-08--human-accepted); future Docker/web exposure checks remain in TODO sections 4 and 6. Marijus accepted the Section 3 baseline and documentation on 2026-09-08. Docker installation is not established by repository evidence. Absence of scripts or configuration does not prove software is absent on the server.
 
 | File | Responsibility |
 |---|---|

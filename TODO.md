@@ -8,19 +8,6 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 The six-file documentation baseline and basic secret-handling rules are Human accepted. Operational secret delivery remains open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
-## 3. Network and firewall
-
-- [ ] Verify recorded VCN/subnet/route/gateway setup and record dated results
-- [ ] Record effective OCI Security List/NSG rules, host firewall, and listening/published ports
-- [ ] Decide SSH source restrictions and host firewall policy before applying rules
-- [ ] Allow only required public ports:
-  - [ ] 22/tcp
-  - [ ] 80/tcp
-  - [ ] 443/tcp
-- [ ] Keep application/database ports private
-- [ ] Configure host firewall after recovery preparation and explicit approval
-- [ ] Verify effective exposure across OCI rules, host firewall, and Docker-published ports; firewall configuration alone is insufficient
-
 ## 4. Docker host
 
 - [ ] Establish current Docker installation state before changes
@@ -31,6 +18,7 @@ The six-file documentation baseline and basic secret-handling rules are Human ac
 - [ ] Configure Docker log rotation
 - [ ] Define container restart policy
 - [ ] Decide Docker data/storage layout
+- [ ] Verify host forwarding/NAT and Docker-published ports with OCI rules; keep direct application/database ports private
 
 ## 5. Demo application architecture
 
@@ -51,6 +39,7 @@ The six-file documentation baseline and basic secret-handling rules are Human ac
 - [ ] Decide dynamic versus reserved addressing and verify relevant existing DNS before changes
 - [ ] Point the chosen hostname(s) to the authorized OCI address after those decisions
 - [ ] Choose Caddy or Nginx before installing/configuring the reverse proxy
+- [ ] At web deployment, separately approve and verify TCP 80/443 ingress across OCI and the host/container path; keep UDP 443 and TCP/UDP 111 outside public policy
 - [ ] Enable HTTPS
 - [ ] Verify HTTP -> HTTPS redirect
 - [ ] Verify certificate renewal

@@ -1,6 +1,70 @@
 # Infrastructure Change Log
 
+## 2026-09-08
+
+### Section 3 closed on final human OCI evidence — Human accepted
+
+Recorded Marijus's confirmation that public-subnet has exactly one attached Security List, Default Security List for demo-vnc, with Console pagination `1 - 1 of 1 total items`, and that the earlier ingress evidence showed Stateless: No for the recorded rules. This resolves the final attachment/statefulness task without independent OCI inspection.
+
+Reviewed the existing host, OCI, rpcbind, external TCP, and UDP 123 evidence; no other unresolved requirement belongs to the present Section 3 baseline. Removed its completed TODO section without renumbering sections 4–10. Updated the inventory/current limitations and README completion status, and reconciled README's stale rpcbind proposal with the previously recorded human execution. Historical assessments and change-log entries are preserved; the latest inventory record supersedes their open-task statements.
+
+Verification: compared documentation with the supplied evidence, reviewed the scoped diff, checked relative links and whitespace, and confirmed preservation of later TODO sections and historical entries. Remaining Docker/web enforcement belongs to sections 4/6. Existing gateway-flag, broader-reachability, and saved-rule/persistence limits remain explicit; no new live or universal exposure verification is claimed. No live access or changes, commit, or push occurred during the documentation reconciliation.
+
+Acceptance recorded 2026-09-08: Marijus explicitly accepted the Section 3 network/firewall baseline and documentation, including the supporting September 7 Section 3 entries below. This supersedes their historical Ready for review statuses; technical conclusions, evidence limits, and completed TODO removal are unchanged. Final repository checks cover the full accepted diff, whitespace, local documentation links, secret/generated-file review, and preservation of the remaining roadmap. The owner authorized committing all accepted Section 3 changes; no push is authorized.
+
 ## 2026-09-07
+
+### Human UDP 123 live-rule reconciliation recorded — Ready for review
+
+Marijus reports consecutive read-only nft, iptables-save, and iptables -S checks on sokoladas-demo, all showing UDP 123 restricted to destination 169.254.169.254. Recorded semantic consistency of the address and /32 representations, removed the resolved TODO item, and updated README/current inventory wording. Earlier conflicting observations remain historical evidence; no cause is invented.
+
+The supplied commands inspect live rules, so no fresh saved-file comparison or reboot-persistence result is claimed. This boundary does not retain the resolved live-rule discrepancy as a blocker. Section 3 remains open only for complete subnet Security List attachments and ingress statefulness evidence.
+
+Verification: compared documentation with the human report, reviewed the scoped diff, checked relative links/whitespace and preservation of prior evidence. No independent live verification, live changes, commit, or push. Ready for review, not Human accepted.
+
+### Human external TCP and OCI egress evidence recorded — Ready for review
+
+Recorded Marijus's September 7 Mac tests against 152.70.25.153: TCP 22 connected; TCP 111, 80, and 443 timed out. These establish source-specific outcomes, not the filtering layer, UDP results, or universal reachability. Recorded one Default Security List for demo-vnc egress rule: 0.0.0.0/0, all protocols/ports, Stateless No (unrestricted stateful IPv4 permission at that list).
+
+Reviewed UDP 123 against original evidence: single-address nft and /32 iptables destination syntax are equivalent. The genuine earlier conflict was nft's destination match versus no destination match in the human iptables-save output and agent-read saved file. Recorded both exact observations and retained only that unresolved evidence issue; both permit OCI NTP, so no policy change is justified.
+
+Removed completed external TCP/egress tasks, narrowed Section 3 to complete subnet Security List attachments/ingress statefulness and UDP 123 reconciliation, and moved future container/web enforcement to sections 4/6. No further live configuration requirement was identified for the current baseline; Section 3 remains open for evidence reconciliation. Gateway flag and untested UDP/other sources remain limitations, not invented additional change requirements.
+
+Verification: compared human evidence and original rule text, reviewed scoped documentation/TODO changes, checked links/whitespace, and preserved prior history. No live access or changes, independent OCI verification, commit, or push. Ready for review, not Human accepted.
+
+### Human-executed rpcbind retirement recorded — Ready for review
+
+Marijus reports successful execution of the approved `systemctl disable --now rpcbind.socket rpcbind.service` followed by `systemctl mask rpcbind.socket rpcbind.service`, both with sudo, on sokoladas-demo. Both units are masked and inactive (dead); the privileged port-111 socket check returned no output and `sudo rpcinfo -p` returned connection refused. Packages were retained. Exact execution/verification times were not supplied.
+
+Recorded commands, human evidence, expected local portmapper failure, and verification limits in docs/server.md; removed the completed rpcbind TODO item. Earlier observations and rollback guidance remain preserved. Section 3 remains open for remaining OCI/network verification and later web/container enforcement; the UDP 123 discrepancy is unchanged.
+
+Verification: compared documentation with the human report, reviewed the scoped edits, checked relative links/whitespace and preservation of remaining TODO items/history. No independent live verification, post-reboot result, broader service-health result, or fresh firewall comparison is claimed. No agent live access or changes, commit, or push. Documentation is Ready for review, not Human accepted.
+
+### rpcbind dependency preflight — Ready for review
+
+Read-only SSH inspection of sokoladas-demo on September 7 starting 17:40:18 UTC. Both rpcbind units remain enabled/running. Installed relationship scan found only nfs-common Depends on rpcbind and no installed recommendation. Cross-checked live and installed unit dependencies, mount/automount configuration, RPC registration, NFS configuration/statd state, and guest-tooling metadata. Found the dormant rpc-statd requirement on rpcbind.socket omitted from loaded-only reverse-dependency output; no active NFS data mount or other registered RPC service was found.
+
+Conclusion: safe to disable/mask both units for the observed role while retaining packages, with separate human approval and execution still required. Recorded operational loss, exact unexecuted rollback/verification steps, and limits in docs/server.md; narrowed the existing TODO to disposition and authorized implementation. Section 3 remains open; no package-removal clearance or successful stopped-service test is claimed.
+
+Verification: checked service state against sockets, package relations against APT, mount/unit/configuration and statd peer evidence, reviewed diff/relative links/whitespace. Noninteractive sudo required authentication; protected per-user jobs, other mount namespaces, and private/compiled agent internals were not exhaustively audited. The readable evidence supports the scoped service-only conclusion, not an absolute absence-of-consumers guarantee. No live service/package/configuration changes, OCI access, secret capture, commit, or push. Ready for review, not Human accepted.
+
+### OCI network evidence and firewall direction recorded — Ready for review
+
+Incorporated Marijus's September 7 Console observations: primary VNIC/subnet, ephemeral public IPv4, default Internet Gateway route, no NSGs or subnet IPv6 prefixes, and the three reported default Security List ingress rules. Combined these with prior guest and human privileged evidence without claiming independent OCI verification or new external reachability.
+
+Recorded the owner's direction in README and the inventory: retain iptables-nft/netfilter-persistent, preserve InstanceServices, keep SSH available without fixed source restrictions, defer global IPv6 and web ingress, and keep RPC/internal service ports nonpublic. Proposed reversible rpcbind service/socket retirement after dependency preflight and separate approval, with package removal deferred. Recorded exact proposed commands, rollback, and verification scope; executed none.
+
+Retained the UDP 123 discrepancy: both reported forms allow the OCI NTP endpoint, so it does not block retaining policy; reconcile before modifying/saving/restoring the affected rules. Narrowed Section 3 to unfinished evidence, rpcbind disposition/authorized implementation, external verification, and later web/container enforcement. Section 3 remains open. Complete Security List attachments, egress/statefulness, and broader reachability are not supplied.
+
+Verification: compared documentation with the human report and prior guest evidence, consulted public primary technical documentation, reviewed the diff, and checked relative links/whitespace. Earlier history preserved. No new SSH inspection, independent OCI access, live changes, credentials, commit, or push. Ready for review, not Human accepted.
+
+### Network and firewall assessment — Ready for review
+
+Authorized read-only SSH inspection of sokoladas-demo on September 7, 17:11:55–17:13:07 UTC. Recorded guest interfaces, IPv4/IPv6 routes and enablement, complete returned TCP/UDP listener inventory, RPC package/service dependencies, firewall technology/persistence, and readable saved IPv4/IPv6 rules in docs/server.md. Updated Section 3 context and remaining verification/decision work; Section 3 remains open.
+
+Observed wildcard SSH and rpcbind, loopback DNS/chrony sockets, and interface-bound DHCP. nfs-common depends on rpcbind, but no mounted NFS filesystem or other registered RPC program was identified. Image-supplied NFS support is a hypothesis, not established installation history. Saved OCI IPv4 rules reject input beyond SSH/ICMP/loopback/established traffic; saved IPv6 has ACCEPT policies only. No policy or rpcbind-retirement decision adopted.
+
+Verification: cross-checked sockets with systemd units, network addresses/routes with networkctl and kernel values, package dependencies with local metadata, and persistence with readable rule files/plugins. Reviewed documentation diff, links, and whitespace. Agent sudo required interactive authentication; Marijus subsequently supplied privileged socket and loaded-rule output (save timestamps 17:14:33/49 UTC), confirming socket ownership, IPv4 input rejection, and empty IPv6 ACCEPT chains. Recorded a discrepancy: nft scopes UDP 123 to 169.254.169.254, while iptables-save and the saved file do not constrain the destination within the link-local chain. Exact agreement for that exception remains unverified. OCI configuration, public reachability beyond this SSH source/session, and other network namespaces remain unverified. Assessment documentation is Ready for review with these limits, not Human accepted or completed exposure verification. No live administrative changes, OCI/DNS changes, secret capture, commit, or push.
 
 ### OCI Serial Console recovery verified by owner — Ready for review
 

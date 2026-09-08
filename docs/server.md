@@ -4,6 +4,361 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## Section 3 closed on human OCI evidence — recorded 2026-09-08 — Human accepted
+
+Source: Marijus's final human-supplied OCI Console evidence, recorded September 8. Exact Console observation times were not supplied; no independent agent OCI or live verification occurred.
+
+`public-subnet` → Security → Security Lists shows exactly one attached Security List, `Default Security List for demo-vnc`, with pagination `1 - 1 of 1 total items`. No additional Security Lists are attached. Marijus also confirms that earlier human-supplied ingress evidence from this list showed **Stateless: No**, establishing that all three recorded ingress rules are stateful:
+
+| Source | Stateful ingress permission |
+|---|---|
+| `0.0.0.0/0` | TCP destination port 22 |
+| `0.0.0.0/0` | ICMP type 3/code 4 |
+| `10.0.0.0/24` | ICMP type 3 |
+
+Together with the earlier no-NSG VNIC evidence and this list's single stateful all-protocol/all-port IPv4 egress rule to `0.0.0.0/0`, this resolves the remaining attachment and statefulness evidence task. The recorded host filtering, human-verified rpcbind retirement, external Mac TCP results, and owner-reconciled UDP 123 live rules support closing the present network/firewall baseline. No other unresolved requirement belongs to Section 3; its completed TODO section is removed without renumbering later sections.
+
+Future Docker forwarding/published-port verification and separately authorized TCP 80/443 opening remain in TODO sections 4 and 6. The gateway's explicit enabled flag, UDP 111/other-source reachability, and fresh saved-rule comparison/reboot persistence remain unverified as previously recorded; these limits do not create additional baseline completion tasks. Recheck relevant state before future rule manipulation or deployment. No universal reachability or runtime/persistent agreement is claimed.
+
+This completion record supersedes earlier Section 3 open-task statements and attachment/ingress-statefulness unknowns below; those dated assessments remain historical evidence. Section 3 is closed **Human accepted**. Marijus accepted the network/firewall baseline and its documentation on 2026-09-08, including the supporting assessment, OCI evidence, rpcbind preflight/retirement, external TCP verification, and UDP 123 reconciliation records below. Their earlier review-status and open-task statements describe historical stages; this acceptance supersedes those statuses without changing the evidence, technical conclusions, or limitations.
+
+Verification: compared the supplied evidence with the recorded topology/rules and remaining roadmap, reviewed the documentation diff, checked relative links and whitespace, and preserved earlier evidence and later TODO sections. No live access or changes, commit, or push.
+
+## UDP 123 live-rule consistency verified by owner — recorded 2026-09-07 — Ready for review
+
+Source: Marijus's fresh human-executed read-only verification on `sokoladas-demo`. The following commands were run consecutively; exact execution times were not supplied:
+
+```bash
+sudo nft list chain ip filter InstanceServices | grep -B2 -A2 'dport 123'
+sudo iptables-save | grep -E 'InstanceServices.*(dport 123|--dport 123)'
+sudo iptables -t filter -S InstanceServices | grep -- '--dport 123'
+```
+
+Human-reported excerpts (ellipses denote omitted output):
+
+```text
+nft: ip daddr 169.254.169.254 udp dport 123 ... accept
+iptables-save: -A InstanceServices -d 169.254.169.254/32 -p udp -m udp --dport 123 ... -j ACCEPT
+iptables -S: same destination-restricted rule
+```
+
+All three current live representations consistently permit UDP destination port 123 to `169.254.169.254` only. The address and `/32` forms are semantically equivalent. The live-rule discrepancy is resolved on this human evidence and removed from TODO; no firewall modification is implied or required.
+
+Earlier conflicting outputs below remain historical evidence, superseded for current live-rule interpretation. Their cause is not established. These three commands inspect loaded rules; `iptables-save` prints the runtime ruleset and does not itself read or update `/etc/iptables/rules.v4`. No fresh saved-file comparison or reboot-persistence test is claimed. That evidence boundary does not retain the resolved live-representation issue as a Section 3 blocker.
+
+At this September 7 assessment, Section 3 had one remaining evidence item: confirm the complete Security List attachment set for public-subnet and the reported ingress rules' stateful/stateless flags. Earlier statements listing UDP 123 as unresolved describe the assessment at that time and are superseded by this record.
+
+Verification: compared the documentation with the supplied consecutive-command results, retained earlier exact observations, reviewed the diff and relative links/whitespace. No independent agent live verification, live changes, commit, or push. Documentation is Ready for review, not Human accepted.
+
+## External TCP verification and OCI egress — recorded 2026-09-07 — Ready for review
+
+Source: Marijus's human-performed tests from his Mac on 2026-09-07 against public IPv4 `152.70.25.153`, plus human-supplied OCI Console evidence. No independent agent network/OCI verification occurred. Exact test commands, source public IP, and execution times were not supplied.
+
+| External TCP test | Human-reported output | Established result |
+|---|---|---|
+| 22 | `Connection to 152.70.25.153 port 22 [tcp/ssh] succeeded!` | TCP connection succeeded from this Mac/network at test time |
+| 111 | `failed: Operation timed out` | No TCP connection completed within the test timeout |
+| 80 | `failed: Operation timed out` | No TCP connection completed within the test timeout |
+| 443 | `failed: Operation timed out` | No TCP connection completed within the test timeout |
+
+These are demonstrated source-specific outcomes, consistent with the recorded policy and rpcbind retirement. Timeouts do not locate the filtering layer, prove a particular host/OCI rule caused them, or prove universal unreachability. They do not test UDP 111, IPv6, other sources, or HTTP/TLS behavior. SSH authentication was not part of these reported connection-test outputs; prior SSH authentication evidence remains separate. No additional broad scan is required merely to repeat these scoped TCP results.
+
+`Default Security List for demo-vnc` has **one egress rule**, as reported by Marijus: destination `0.0.0.0/0`, all protocols/all ports, **Stateless: No**. This establishes unrestricted IPv4 outbound permission and statefulness for that Security List's egress rule. It does not override the guest's `InstanceServices` restrictions, establish IPv6 egress, or supply the ingress rules' statefulness. The earlier egress-unknown statements are superseded for this list.
+
+### Historical UDP 123 review — superseded by fresh live verification
+
+The forms in the latest question are semantically equivalent:
+
+```text
+nft:           ip daddr 169.254.169.254 udp dport 123 accept
+iptables-save: -d 169.254.169.254/32 -p udp --dport 123 -j ACCEPT
+```
+
+An IPv4 address and that same address with `/32` match the same single destination. Protocol spelling, counters, and iptables formatting are not a discrepancy.
+
+However, the earlier observations actually supplied were different. The earlier human privileged nft output contained this rule (zero counters shown):
+
+```text
+ip daddr 169.254.169.254 udp dport 123  counter packets 0 bytes 0 accept
+```
+
+The earlier human `iptables-save` output, timestamped September 7 at 20:14:33 local time, contained this exact line:
+
+```text
+-A InstanceServices -p udp -m udp --dport 123 -m comment --comment "See the Oracle-Provided Images section in the Oracle Cloud Infrastructure documentation for security impact of modifying or removing this rule" -j ACCEPT
+```
+
+The agent's earlier read of `/etc/iptables/rules.v4` also returned the latter line with **no `-d` destination match**. The OUTPUT jump into this chain was `-A OUTPUT -d 169.254.0.0/16 -j InstanceServices`, so this version permits UDP 123 throughout that link-local destination range; the nft version permits only `169.254.169.254`. Both permit the OCI NTP endpoint and neither opens inbound NTP. The latest conditional example is not a new rule capture or an explicit correction of those earlier observations.
+
+The genuine evidence conflict therefore remains the **absent destination match**, not `/32` serialization. No cause or live defect is established. Resolve it by a same-session read-only capture of nft/iptables-save and the saved IPv4 file, or a human correction identifying which earlier pasted observation was inaccurate. No rule change is justified from this record. It does not block retaining the present firewall policy; it prevents claiming a fully reconciled runtime/persistent rules inventory or using these snapshots to rewrite/save/restore InstanceServices.
+
+### Section 3 completion review at that time — UDP 123 subsequently resolved
+
+No further live configuration change is currently established as necessary. The host policy direction is selected, rpcbind retirement is human-verified, and the scoped external TCP checks and default-list egress evidence are now recorded. Do not open unused web ports, add UFW, remove packages, or enable IPv6 to complete this section.
+
+Two evidence tasks remain before claiming Section 3's effective-rule inventory fully complete:
+
+- Confirm the complete Security List attachment set for public-subnet and the three reported ingress rules' stateful/stateless flags. No NSGs is already established; egress for the reported list is now established. A separate gateway-enabled screenshot is not a current blocker given the recorded gateway route and successful public IPv4 connection; the exact Console flag remains unrecorded without invalidating the demonstrated path.
+- Reconcile the specific UDP 123 destination-match observations above. This is an inventory-evidence task, not a finding that NTP is broken or an instruction to change rules.
+
+Section 3 remains open for those two items. Future TCP 80/443 opening and container forwarding/published-port checks belong to Docker/web deployment and have been moved to TODO sections 4 and 6; they need not hold the present baseline assessment open. UDP 111 and other-source reachability remain explicitly untested, but absence of all-network testing is not by itself a new blocker after the human-verified listener removal. Human acceptance remains separate from Ready for review.
+
+Verification: compared new evidence with the human report and earlier exact rule outputs, reviewed the documentation/task diff, checked relative links and whitespace, and preserved historical entries. No live access or changes, commit, or push.
+
+## Human-executed rpcbind retirement — recorded 2026-09-07 — Ready for review
+
+Source: Marijus reports the human-approved change was executed successfully on `sokoladas-demo`. Exact execution and verification times were not supplied. No independent agent live verification was performed for this documentation update.
+
+Human-executed commands:
+
+```bash
+sudo systemctl disable --now rpcbind.socket rpcbind.service
+sudo systemctl mask rpcbind.socket rpcbind.service
+```
+
+| Human verification | Reported result |
+|---|---|
+| `rpcbind.socket` | Masked, inactive (dead) |
+| `rpcbind.service` | Masked, inactive (dead) |
+| `sudo ss -lntup \| grep ':111'` | No output; no port-111 listener reported by this check |
+| `sudo rpcinfo -p` | `can't contact portmapper: RPC: Remote system error - Connection refused` |
+| Packages | Not removed; rpcbind and nfs-common retained |
+
+The refused local portmapper query is the expected result of this retirement, corroborating the inactive units and absent port-111 listener. It is not an external reachability test. Both the daemon and activation socket were masked to prevent reactivation; package dependencies remain installed.
+
+This later human evidence supersedes earlier enabled/running/listening observations and the pending retirement proposal for current recorded state. Earlier assessments remain historical evidence. The rollback commands and success checks in the preflight below remain available if restoration is separately authorized; rollback was not performed or tested. No post-reboot test, broader service-health check, or fresh firewall comparison was supplied, and none is claimed.
+
+The rpcbind retirement item is implemented and verified on the supplied human evidence and removed from TODO. Section 3 remains open for OCI rule details, the preserved outbound UDP 123 discrepancy, external exposure verification, and future Docker/web enforcement. This documentation is Ready for review, not Human accepted. No agent SSH/OCI access, additional live changes, commit, or push occurred.
+
+## rpcbind dependency preflight — 2026-09-07 — Ready for review
+
+**Conclusion: safe to disable/mask** `rpcbind.service` and `rpcbind.socket` for the currently observed local web/application/database host role, retaining installed packages. This is a scoped operational assessment, not proof that arbitrary future RPC workloads will work, permission to execute, or a package-removal assessment. No service was stopped, disabled, masked, removed, or reconfigured.
+
+Source: authorized read-only SSH as marijus at `152.70.25.153`, hostname `sokoladas-demo`, starting 17:40:18 UTC on September 7; a subsequent batch was timestamped 17:41:11–17:41:12 UTC, followed by the configuration/state-count checks described below. No OCI access occurred. The findings support the earlier conditional retirement proposal; Section 3 remains open for the owner's disposition and separately authorized implementation/verification.
+
+### Service and installed-package dependencies
+
+- Both rpcbind units report `UnitFileState=enabled`, `ActiveState=active`, `SubState=running`. TCP/UDP 111 remains bound on wildcard IPv4/IPv6; `/run/rpcbind.sock` is listening. `rpcbind.service` requires `rpcbind.socket` and wants `remote-fs-pre.target` and `rpcbind.target`.
+- A scan of **installed** dpkg Pre-Depends, Depends, Recommends, and Suggests fields found exactly one package relation mentioning rpcbind: `nfs-common` **Depends** on it. No installed package recommendation for rpcbind was found. `apt-cache rdepends --installed rpcbind` corroborated nfs-common. Package presence requirements do not require the daemon to remain running; retaining both packages preserves that package dependency.
+- Loaded reverse dependencies show rpcbind.service under multi-user.target and rpcbind.socket under rpcbind.service/sockets.target. Scanning installed unit files additionally found inactive `rpc-statd.service` with `Requires=rpcbind.socket`: loaded-only dependency output was incomplete for dormant units. rpc-statd identifies itself as the NFSv2/v3 locking status monitor.
+- `nfs-common` and rpcbind remain installed. `autofs` and `ypbind-mt` have no package records; `nis` and `libnss-nis` are not installed. `autofs.service` and `ypbind.service` are not found.
+
+### Mounts, automounts, and RPC consumers
+
+- `findmnt` returned no NFS/NFS4 data mounts. The root filesystem is ext4 on `/dev/sda1`; fstab contains only ext4, vfat, and swap entries. Installed and loaded mount/automount listings contain no configured NFS data mount. `proc-fs-nfsd.mount` is an installed static support unit, not an observed mounted NFS export; `/run/rpc_pipefs` is active support infrastructure, not a remote data mount.
+- The only loaded automount is systemd's `proc-sys-fs-binfmt_misc.automount`, unrelated to NFS. `/etc/auto.master`, `/etc/auto.master.d`, `/etc/autofs.conf`, and `/etc/default/autofs` are absent; no `/etc/auto.*` maps were returned. `/etc/exports` and `/etc/exports.d` are absent.
+- No active RPC/NFS reference outside the packaged NFS/rpcbind units appeared in the inspected local, runtime, generated, and vendor systemd unit files or system cron directories/crontab. Symlink files were skipped by the text scan; installed/loaded unit listings were checked separately. This was not a scan of every executable on disk.
+- `nfs-client.target` is active. `rpc-statd-notify` is active/exited; rpc-statd, rpc-gssd, rpc-svcgssd, and nfs-idmapd are inactive. Local `rpcinfo -p 127.0.0.1` returned only portmapper program 100000, versions 2/3/4 over TCP/UDP. No other registered RPC server or recognizable active NFS/NIS userspace consumer appeared in the inspected process names. An unregistered/transient RPC client is not excluded solely by rpcinfo.
+- `/var/lib/nfs/sm` and `sm.bak` are readable and both have zero entries: no recorded statd peer files there. `/proc/fs/nfsfs/servers` and `volumes` are absent; failed reads were not treated as successful empty tables.
+- `/etc/nfs.conf` contains section headers plus `pipefs-directory=/run/rpc_pipefs` and `manage-gids=y`; `/etc/idmapd.conf` contains verbosity and nobody/nogroup mappings. No mount/server selection was found in these files; `/etc/nfsmount.conf` is absent and no matching configuration drop-in files were returned.
+- `/etc/nsswitch.conf` contains `netgroup: nis`, but no automount entry or other NIS match appeared. With no installed NIS NSS module/ypbind package, no ypbind service, and no observed consumer, this line does not establish working NIS use or a rpcbind requirement.
+- `/usr/local/bin`, `/usr/local/sbin`, `/opt`, and `/srv` each contain zero entries. These scoped negatives support the existing fresh-host context, not a claim that all protected or user-specific configuration was audited.
+
+### OCI/Ubuntu tooling and expected operational impact
+
+No direct rpcbind dependency/recommendation appeared in the installed cloud-init, Ubuntu metapackage, open-iscsi, or multipath-tools metadata. Oracle Cloud Agent and updater systemd dependencies refer to their snap mount, ordinary system targets, and networking, not rpcbind. The agent's readable snap metadata contains no rpcbind/nfs-common/mount.nfs reference. iscsid and multipathd dependencies do not name rpcbind. The cloud-init package family was covered by package metadata and the unit-file scan; an empty response for the legacy `cloud-init.service` name was not treated as evidence of a loaded service. No complete audit of compiled agent plugins was performed.
+
+The evidence supports no expected loss to the currently observed SSH, local storage, DNS/DHCP, time synchronization, or guest-agent role from retiring rpcbind alone. This is an inference from dependencies and observed use, not a stop/restart experiment. Original image installation provenance remains unproven and does not need to be known to make this scoped runtime decision.
+
+What would be lost: local/remote rpcbind registration and lookup on TCP/UDP 111 and its Unix socket; dependent legacy NFSv2/v3 status/locking services such as rpc-statd would be unable to start while the socket is masked. Future legacy NFS or another application requiring local portmapper would need this decision reversed. This does not disable every kind of RPC transport. Ubuntu's [nfs.systemd manual](https://manpages.ubuntu.com/manpages/resolute/man7/nfs.systemd.7.html) states that NFSv4-only operation does not require rpcbind, whereas dependent NFSv3 services will refuse to start when it is masked. No NFSv4 deployment was tested here.
+
+### Exact rollback for the proposed service/socket retirement
+
+Only if the separately approved change later disables/masks these two units while retaining packages, restore the observed enabled/running state with:
+
+```bash
+sudo systemctl unmask rpcbind.socket rpcbind.service
+sudo systemctl enable rpcbind.socket rpcbind.service
+sudo systemctl start rpcbind.socket
+sudo systemctl start rpcbind.service
+systemctl show rpcbind.socket rpcbind.service -p Id -p UnitFileState -p ActiveState -p SubState
+sudo ss -lntup
+rpcinfo -p 127.0.0.1
+systemctl --failed --no-pager
+```
+
+Success: both units enabled and active/running, IPv4/IPv6 TCP/UDP 111 restored, local portmapper registration returned, and no new relevant failed units. If retirement caused a dependent consumer to fail, restore rpcbind first and separately restart/verify that identified consumer as appropriate; none currently runs that requires such restoration. Do not blindly reset failure state. No package install, firewall restore, reboot, or OCI action is part of this rollback. Commands are proposed and unexecuted; rollback has not been experimentally tested. Existing marijus SSH, ubuntu fallback, and human-tested Serial Console remain the recorded access/recovery paths.
+
+### Verification limits
+
+`sudo -n true` still required interactive authentication; no elevated observation was available in the agent session. The service/package/configuration/state evidence used for this conclusion was readable without sudo. Other users' protected crontabs, home/root scripts, other process mount namespaces, and private agent configuration were not exhaustively inspected. These residual limits do not reveal a concrete dependency and do not outweigh the directly observed empty NFS configuration/use and standard dependencies for this narrow, reversible service-only recommendation. They do prevent a universal no-consumer guarantee or package-removal clearance.
+
+The preflight establishes the evidence supporting a future decision; no behavior with rpcbind stopped is claimed. The earlier UDP 123 discrepancy and OCI/external verification tasks are unchanged and unrelated to this dependency result. Reviewed the documentation diff, attribution, relative links, and whitespace. No secrets or process environments collected, no live administrative changes, commit, or push; normal read-session logging/access-time effects were not suppressed.
+
+## OCI network evidence and firewall decisions — 2026-09-07 — Ready for review
+
+Source: Marijus's OCI Console observations dated 2026-09-07, combined with the separately attributed guest assessment below. No independent OCI verification or new SSH inspection was performed for this update. Human policy directions are recorded as directions, not authorization to execute changes or acceptance of this documentation. This later record supersedes the earlier assessment's open policy questions and OCI unknowns only where evidence below resolves them.
+
+### 1. Final observed network topology
+
+| Object | Human-supplied Console evidence |
+|---|---|
+| Primary VNIC of `sokoladas-demo` | Subnet `public-subnet`; private IPv4 `10.0.0.52`; public IPv4 `152.70.25.153`, **Ephemeral**; route table `Default Route Table for demo-vnc`; **no NSGs** |
+| `public-subnet` | `10.0.0.0/26`, Public (Regional); no Oracle-allocated, BYOIP, or ULA IPv6 prefix |
+| `Default Route Table for demo-vnc` | Static `0.0.0.0/0` route to Internet Gateway `demo-internet-gateway`, description `Internet access` |
+| `Default Security List for demo-vnc` ingress | `0.0.0.0/0` to TCP destination 22; `0.0.0.0/0` to ICMP type 3/code 4; `10.0.0.0/24` to ICMP type 3. No TCP/UDP 111 or TCP 80/443 ingress rule observed |
+
+Combined topology: recorded public IPv4 → primary VNIC private IPv4 `10.0.0.52` in `public-subnet`; guest `enp0s6` has `10.0.0.52/26`, default gateway `10.0.0.1`; the associated route table points Internet traffic at `demo-internet-gateway`. The public address is ephemeral, not reserved or guaranteed stable. Guest IPv6 remains enabled with only `fe80::17ff:fe03:2073/64` on enp0s6, loopback `::1`, and no IPv6 default route; the subnet has no IPv6 prefix.
+
+The supplied report identifies the relevant default Security List but does not explicitly enumerate the subnet's complete Security List attachment set, egress rules, or stateful/stateless flags. These details and the gateway's explicit enabled status were not supplied. Do not infer them from defaults or object names. The VCN-wide CIDR remains historical evidence; the ICMP source CIDR alone does not reverify it.
+
+### 2. Effective current exposure by service/port
+
+This table separates observed filtering from end-to-end reachability. OCI permission refers to the reported Security List, not an independently audited union of all attachments.
+
+| Service/port | Guest listener | Loaded host filter | Reported OCI ingress | Demonstrated external reachability |
+|---|---|---|---|---|
+| SSH TCP 22 | Wildcard IPv4/IPv6, sshd/systemd | IPv4 NEW TCP 22 accepted; IPv6 ACCEPT | IPv4 permitted from `0.0.0.0/0` | Successful prior SSH from inspection source only |
+| rpcbind TCP/UDP 111 | Wildcard IPv4/IPv6, rpcbind/systemd | Ordinary new non-loopback IPv4 input rejected; IPv6 ACCEPT | No allow observed | Not tested; no public exposure demonstrated |
+| HTTP TCP 80 / HTTPS TCP 443 | None | Ordinary new IPv4 input rejected; IPv6 ACCEPT | No allow observed | Not tested; no service demonstrated |
+| DNS TCP/UDP 53 | `127.0.0.53`, `127.0.0.54`, systemd-resolved | Loopback accepted | No allow in supplied list | No externally bound DNS socket observed |
+| DHCP UDP 68 | `10.0.0.52%enp0s6`, systemd-networkd | No explicit INPUT port-68 allow; do not equate this with DHCP failure | No allow in supplied list | Guest DHCP lease observed; not a public application endpoint |
+| chrony UDP 323 | `127.0.0.1`, `::1`, chronyd | Loopback accepted | No allow in supplied list | No externally bound chrony control socket observed |
+| Application/database ports | None identified in assessed namespace | Remaining ordinary new IPv4 input rejected | No allow in supplied list | Not demonstrated; reassess with containers |
+
+Host IPv4 also accepts RELATED/ESTABLISHED traffic and ICMP before its final reject. The OCI list is more selective about ICMP: the two types/sources above. IPv6 ACCEPT is a real guest filtering property, but neither global IPv6 addressing nor an IPv6 Internet route is present in the evidence. No claim that IPv6 is disabled or that link-local peers are filtered is made. The earlier nft dump showed no NAT/Docker tables; future published ports require fresh checks.
+
+### 3. Target firewall policy — owner direction
+
+Retain Oracle-image `iptables-nft` with `netfilter-persistent`; do not install UFW simply to add another abstraction. Preserve `InstanceServices` unchanged unless a specific justified change is separately approved. Keep administrative TCP 22 available, including the currently reported OCI source `0.0.0.0/0`. Do not impose one fixed administrator source IP: administration uses changing networks, SSH is key-only by the recorded human hardening evidence, and Serial Console recovery is human-verified.
+
+Do not enable OCI IPv6 now. Retain and document the guest's current permissive IPv6 state; any future global IPv6 enablement requires an explicit IPv6 host-firewall and OCI security-rule design first. No guest IPv6 kernel or firewall change is proposed now.
+
+Future public application ingress is **TCP 80 and TCP 443 only**, in addition to TCP 22; UDP 443 is not included. Keep web ports closed until the separately approved HTTP/reverse-proxy deployment needs them. Section 3 does not require opening unused ports. Keep TCP/UDP 111 and direct application/database ports outside intended public exposure. Preserve current provider access and ICMP behavior; no new egress policy is selected from incomplete OCI egress evidence. Docker forwarding/published-port policy must be reviewed during Docker/web deployment rather than assuming today's INPUT chain will govern it.
+
+### 4. Recommendation for nfs-common / rpcbind
+
+No demonstrated workload requires network RPC: no NFS mounts, only portmapper registered, and the intended local web/application/database role has no stated NFS dependency. The installed `nfs-common` dependency explains why rpcbind can be present, but not its original installation provenance. OCI image membership alone does not prove a runtime requirement. Conversely, the current evidence is not a complete dependency/removal audit.
+
+Recommend retaining the packages initially and, after a short dependency preflight and separate approval, stopping, disabling, and masking **both** `rpcbind.service` and `rpcbind.socket`. Disabling only the service is insufficient to prevent socket activation. Ubuntu's [NFS systemd manual for the installed nfs-common version](https://manpages.ubuntu.com/manpages/resolute/man7/nfs.systemd.7.html) documents masking rpcbind when NFSv2/v3 is not required. This is a reasonable reversible reduction of an unused listener, not an urgent repair of demonstrated public exposure.
+
+Before execution, confirm no configured dormant NFS/automount/custom RPC consumer and review reverse dependencies for both units and both packages. Do not assume iscsid/multipathd or the Oracle Cloud Agent can be removed with them. Oracle documents separate [link-local metadata, DNS, NTP, and iSCSI services](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/compute_security.htm); that documentation does not certify this VM's full dependency graph.
+
+Removing `nfs-common` and `rpcbind` is also reasonable in principle if NFS is deliberately excluded, but defer package removal until an observational `apt-get -s remove nfs-common rpcbind` plan and installed reverse dependencies have been reviewed. Do not use autoremove or purge as a shortcut. Package retention with masked units avoids an unreviewed package cascade and is easier to reverse. NFSv2/v3 or another RPC consumer introduced later would require revisiting the decision.
+
+### 5. Remaining issues and Section 3 completion boundary
+
+**UDP 123 discrepancy retained:** supplied nft output allows UDP 123 only to `169.254.169.254`; supplied iptables-save and the readable saved file allow UDP 123 to the range selected by the OUTPUT jump (`169.254.0.0/16`). Both allow OCI's documented NTP address `169.254.169.254:123`, and neither opens inbound public NTP. Thus this discrepancy does **not** prevent adopting the retain-existing-policy direction, leaving web ports closed, or evaluating rpcbind retirement. It does prevent claiming exact runtime/persistent agreement or safely regenerating/replacing `InstanceServices` from these inconsistent snapshots. No cause (transcription, timing, or translation) has been proven.
+
+A same-session read-only recapture of `sudo nft list ruleset`, `sudo iptables-save`, and the saved IPv4 file should reconcile the NTP rule before a rule rewrite/save/restore is proposed. Inspect the exact rule rather than assuming equal rendering. No rule correction is justified yet. This qualifies the earlier assessment's broader statement that the discrepancy had to be resolved before any policy decision.
+
+Section 3 remains open for the human rpcbind disposition decision and, if adopted, its separately authorized implementation/verification; remaining effective-rule evidence (complete subnet Security List attachments, egress and statefulness) and scoped external exposure verification are also unfinished. These are limits to a claim of completed effective-exposure verification, not reasons to install a firewall or open ports. The NTP reconciliation remains an evidence follow-up and a prerequisite specifically to manipulating the affected rules. Web/container enforcement is deferred to deployment; absence of a web service is not an immediate remediation requirement.
+
+### 6. Exact proposed live changes — not authorized or executed
+
+**No host-firewall, OCI, SSH, DNS, IPv6, or package change is proposed for immediate execution.** The concrete optional service-retirement proposal for separate approval targets only rpcbind on `sokoladas-demo`, subject to the dependency preflight above:
+
+```bash
+sudo systemctl disable --now rpcbind.socket rpcbind.service
+sudo systemctl mask rpcbind.socket rpcbind.service
+```
+
+Verify both units inactive and masked, no TCP/UDP 111 listener in privileged `ss -lntup`, no new relevant failed units, unchanged firewall rules, and continued SSH/provider-service health. Capture pre-change status first. Existing evidence records both units enabled/active; rollback to that state, if needed, is:
+
+```bash
+sudo systemctl unmask rpcbind.socket rpcbind.service
+sudo systemctl enable --now rpcbind.socket rpcbind.service
+```
+
+These commands are review material, not a tested runbook or permission to execute. The recorded primary access is marijus SSH, fallback is ubuntu SSH with sudo, and independent recovery is the owner's tested Serial Console path. Fresh prerequisites and success checks belong with any authorized live execution.
+
+Future web deployment would separately propose TCP 80/443 ingress in the applicable OCI rule set and the host/container forwarding path, with listener and external verification. Exact deployment rules depend on the chosen container topology and are not proposed for execution now.
+
+Documentation verification: compared every Console field with the human report, cross-checked host/listener claims against the earlier evidence, retained the NTP discrepancy and provenance limits, reviewed the diff and relative links/whitespace. Public vendor documentation was consulted for technical context only; no authenticated OCI access, SSH session, live change, commit, or push occurred in this update.
+
+## Network and firewall assessment — 2026-09-07 — Ready for review
+
+Authorized read-only SSH inspection of `marijus@152.70.25.153`, reporting `sokoladas-demo`, at 17:11:55–17:13:07 UTC (remote clock). No live configuration, package, service, firewall, kernel, OCI, or DNS changes were made. The assessment and documentation are Ready for review with the human-supplied privileged evidence below; effective public exposure and TODO section 3 are not complete.
+
+### 1. Observed guest network state
+
+- `lo` is administratively up, with `127.0.0.1/8` and `::1/128`. `enp0s6` is UP/LOWER_UP, uses `virtio_net`, MTU 9000, and has `10.0.0.52/26` plus link-local `fe80::17ff:fe03:2073/64`. These were the only interfaces returned by `ip -br link/address`; no Docker bridge appeared.
+- IPv4 main routes: default via `10.0.0.1` on `enp0s6`, DHCP source `10.0.0.52`, metric 100; connected `10.0.0.0/26`; explicit on-link routes to `10.0.0.1`, `169.254.0.0/16`, and `169.254.169.254`. Local-table routes cover the guest/loopback addresses and broadcasts.
+- `networkctl status enp0s6` reports routable/configured, DHCPv4 via `169.254.169.254`, gateway `10.0.0.1`, DNS `169.254.169.254`, and search domain `demovnc.oraclevcn.com`. This does not verify the recorded OCI VCN name or control-plane routes.
+- IPv6 routes cover link-local `fe80::/64`, the local addresses, and multicast `ff00::/8`; no global IPv6 address or IPv6 default route was returned. IPv4 rules are the standard local/main/default table lookups; IPv6 rules are local/main lookups.
+- IPv4 is operational. IPv6 `disable_ipv6` values for `all`, `default`, and `enp0s6` are all `0`: IPv6 is enabled, despite lacking observed global connectivity. IPv4 `ip_forward` and IPv6 `all/forwarding` are `0`.
+- The successful key-authenticated SSH session to `152.70.25.153:22` establishes reachability from this inspection source at that time. The public address is not assigned to a guest interface in the returned address list. No general outbound Internet test or external port scan was performed.
+
+### 2. Observed host firewall state
+
+| Mechanism | Observed evidence |
+|---|---|
+| UFW | Package not installed (`un`); `ufw.service` not found. An existing `/etc/ufw` directory from earlier inspection does not establish UFW enforcement |
+| iptables | `iptables` 1.8.11-2ubuntu3 installed; both `iptables --version` and `ip6tables --version` report `nf_tables` backend |
+| nftables | Package 1.1.6-1 installed; `nftables.service` disabled and inactive. This does not mean the kernel nftables ruleset is empty |
+| Persistence | `iptables-persistent` and `netfilter-persistent` 1.0.24 installed; `netfilter-persistent.service` enabled, active/exited, startup status 0. Its installed plugins load `/etc/iptables/rules.v4` and `rules.v6` using the restore tools. Plugins were read, never executed by the assessment |
+| Loaded rules | Agent queries were denied without interactive sudo. Marijus subsequently supplied privileged `nft list ruleset`, `iptables-save`, and `ip6tables-save` output on September 7; save timestamps are 20:14:33 and 20:14:49 server local time (17:14:33/49 UTC). The outputs establish loaded IPv4/IPv6 filter rules; attribution is human-supplied evidence, not agent sudo execution |
+
+Both readable saved rule files contain `CLOUD_IMG` provenance comments identifying the Cloud Image build process and Oracle Cloud Infrastructure configuration. Their displayed modification date is August 14; this is file metadata, not proof of the original installation history or currently loaded state.
+
+Saved IPv4 filter table, in order:
+
+```text
+INPUT policy ACCEPT
+  ACCEPT RELATED,ESTABLISHED
+  ACCEPT ICMP
+  ACCEPT input on lo
+  ACCEPT NEW TCP destination port 22
+  REJECT all remaining input with icmp-host-prohibited
+FORWARD policy ACCEPT
+  REJECT all forwarded traffic with icmp-host-prohibited
+OUTPUT policy ACCEPT
+  jump to InstanceServices for destination 169.254.0.0/16
+```
+
+The saved `InstanceServices` chain permits TCP 3260 for UID 0 to `169.254.0.2/32`, `169.254.2.0/24`, `169.254.4.0/24`, and `169.254.5.0/24`; TCP 80 to `169.254.0.2`, `169.254.0.4`, and `169.254.169.254`; UID-0 TCP 80 to `169.254.0.3`; TCP/UDP 53 and UDP 67/69 to `169.254.169.254`; and UDP 123 within the link-local destination range selected by the OUTPUT jump. It then rejects remaining TCP there with TCP reset and remaining UDP with ICMP port-unreachable. These rules are relevant to preserving provider-service access in a future policy.
+
+Saved IPv6 contains only a filter table with INPUT, FORWARD, and OUTPUT policies ACCEPT, with no appended rules. The saved IPv4 policy would reject new non-loopback inbound TCP/UDP 111 and TCP 80/443 if loaded unchanged; the saved IPv6 policy would not filter them. The subsequent human-supplied loaded rules confirm this INPUT/FORWARD behavior and the empty IPv6 ACCEPT chains. The nft dump contains only `ip filter` and `ip6 filter`, with no NAT or Docker tables shown. Both save outputs match the saved rule structure apart from counters. A discrepancy remains: the supplied nft output scopes the UDP 123 exception to `169.254.169.254`, whereas saved rules and iptables-save leave its destination unrestricted within the OUTPUT jump to `169.254.0.0/16`. Do not claim exact agreement for that exception; a same-session recapture is needed to reconcile it. Counter values and two rejected IPv4 packets do not identify which public ports or sources were tested.
+
+### 3. Services/listeners and their apparent necessity
+
+Complete TCP listening and UDP bound/unconnected socket inventory returned by `ss -lntup` in the session's network namespace:
+
+| Protocol | Local address(es) | Port | Attribution and purpose |
+|---|---|---|---|
+| TCP | `0.0.0.0`, `[::]` | 22 | `ssh.socket`/`ssh.service`; systemd socket listing confirms ownership; required for the recorded administrative path |
+| TCP and UDP | `0.0.0.0`, `[::]` | 111 | `rpcbind.socket`/`rpcbind.service`; socket unit explicitly binds these four endpoints |
+| TCP and UDP | `127.0.0.53%lo`, `127.0.0.54` | 53 | `systemd-resolve` PID 607 in owner’s privileged output; loopback DNS |
+| UDP | `10.0.0.52%enp0s6` | 68 | `systemd-network` PID 1111 in owner’s privileged output; DHCPv4 client |
+| UDP | `127.0.0.1`, `[::1]` | 323 | `chronyd` PID 1285 in owner’s privileged output; loopback control |
+
+Unprivileged `ss` returned no process details. Marijus’s subsequent privileged `ss -lntup` confirms the same complete socket list and all process attributions: sshd PID 1244 plus systemd PID 1 for port 22; rpcbind PID 901 plus systemd PID 1 for port 111; other PIDs are in the table. No other wildcard TCP/UDP listener appeared. No listener appeared on 80, 443, 2049, or a recognizable application/database port. This does not enumerate other network namespaces or prove the absence of NAT-only published ports.
+
+`rpcbind` package 1.2.7-1build2 owns `/usr/sbin/rpcbind` and its socket unit. Both service and socket are enabled and active/running; the process runs as `_rpc` (PID 901). Configuration supplies `OPTIONS="-w"`; the socket unit explicitly binds wildcard IPv4/IPv6 TCP/UDP 111. The unit requires its socket, so any later service-retirement proposal must account for socket activation as well as the daemon.
+
+Installed `nfs-common` 1:2.8.5-1ubuntu1 depends on rpcbind and is its only installed reverse dependency returned by `apt-cache rdepends --installed rpcbind`. `nfs-common` is marked manually installed by APT; this flag does not identify a human installation. Image-supplied NFS client support is a plausible explanation for rpcbind's presence, not a proven image-build history. No nfs/rpcbind matches appeared in the inspected current APT/dpkg logs, and `/var/log/installer` was absent. Exact original installation cause remains unknown. Ubuntu documents rpcbind's relationship to NFS services in its [NFS systemd manual](https://manpages.ubuntu.com/manpages/noble/man7/nfs.systemd.7.html); that general relationship is also established by this VM's package metadata.
+
+`nfs-client.target` is enabled/active; `rpc-statd-notify` is active/exited, while `rpc-statd` and `nfs-idmapd` are inactive. `findmnt` found no NFS/NFS4 mounts; `/etc/fstab` had no nfs/rpcbind matches. `/run/rpc_pipefs` exists, which is NFS/RPC support infrastructure, not an NFS data mount. Local `rpcinfo -p 127.0.0.1` returned only portmapper program 100000, versions 2/3/4 over TCP/UDP 111. No NFS server package is installed. Thus there is an installed dependency and active NFS support target, but no observed workload requiring network RPC service. This is insufficient to certify removal as safe for dormant/future mounts or uninspected custom components.
+
+`iscsid`, `multipathd`, and Oracle Cloud Agent services run; no dependency on rpcbind was established for them. No Docker/Podman/Nginx/Apache/Caddy executable was returned by PATH checks, and no corresponding running service appeared. These are scoped negative observations, not a full package/filesystem/container audit.
+
+### 4. Security findings
+
+- Port 111 is an additional wildcard service outside the intended public port set. The observed loaded IPv4 INPUT chain rejects new non-loopback traffic to it unless accepted by the preceding RELATED/ESTABLISHED rule; public reachability remains untested. Local listening alone is not an exposure finding. The current evidence supports reviewing its necessity.
+- Loaded and saved IPv4 and IPv6 policies differ materially. Link-local-only IPv6 is not the same as disabled IPv6, and future global addressing would require deliberate IPv6 policy review.
+- There is an existing firewall persistence mechanism. UFW absence and an inactive nftables service do not establish an unprotected host. Human-supplied loaded rules now establish the filter state; reconcile the NTP exception discrepancy before defining changes.
+- Future HTTP/HTTPS needs a listener and suitable effective host/OCI rules. No web listener is present; the loaded and saved IPv4 rules contain no web ingress allow before rejection. Outbound link-local TCP 80 exceptions do not open inbound HTTP.
+- Future container exposure needs separate published-port/NAT/forwarding verification; current socket output alone cannot prove privacy. No firewall weakening or service retirement has been authorized.
+
+### 5. Unknowns requiring OCI-side or external verification
+
+Record the actual VNIC/subnet attachments, all associated Security Lists and NSGs, their combined ingress/egress rules (including sources and stateful/stateless behavior), effective route table, Internet gateway state, public-IP mapping/allocation, and IPv6 assignments. Guest routes do not verify these control-plane objects or the historical VCN/subnet/gateway names.
+
+External verification from agreed sources is needed for TCP 22/80/443 and TCP/UDP 111, plus relevant IPv6 and private-service reachability after policy decisions. SSH success proves only this tested source/session. No DNS, arbitrary-source reachability, cloud firewall, or external UDP behavior was tested.
+
+Marijus supplied the requested privileged socket/rule outputs, resolving the initial authentication-related evidence gap. UFW also returned command not found under sudo. Remaining guest follow-up is a same-session read-only recapture of `nft list ruleset` and `iptables-save` to reconcile the UDP 123 destination discrepancy; inspect other backends/namespaces or filtering mechanisms if needed for the eventual exposure verification. These outputs do not audit legacy rules, eBPF filtering, or every network namespace. No alternate-account escalation or authentication bypass was attempted.
+
+### 6. Proposed decisions for human review
+
+These are proposals only; no policy choice is adopted by this assessment.
+
+- Decide whether NFS client capability is required. If not, separately authorize a concrete rpcbind service/socket retirement plan after dependency and recovery review; package removal is a separate decision.
+- Decide SSH source restrictions and intended HTTP/HTTPS audience, then choose one reproducible host-firewall management approach informed by the loaded rules and reconciled NTP exception. Preserve required provider-service access and the established recovery path.
+- Decide IPv6 exposure before global IPv6 or web deployment; make IPv4/IPv6 policy intentional.
+- Obtain OCI-side evidence and reconcile the loaded-rule discrepancy before applying policy; verify exposure again when Docker and the reverse proxy exist.
+
+Evidence method: `ss`, `ip` address/link/routes/rules, `networkctl`, read-only `/proc/sys` values, systemd show/cat/socket/dependency listings, dpkg/APT metadata, `findmnt`, local `rpcinfo`, current package-log keyword searches, and readable saved firewall rules/loader files. Initial local sandbox SSH denial was resolved by an approved network retry; the default key was rejected and the established Oracle key succeeded with strict host-key checking. Remote `rg` was unavailable; the relevant keyword search was repeated with `grep`. Initial agent privileged failures remain recorded; later successful privileged evidence was supplied by Marijus, not independently executed by the agent. Normal SSH/sudo logging and read access-time effects were not suppressed. No secrets, private keys, process environments, or application data contents were captured. No commit or push.
+
 ## OCI Serial Console recovery — verified 2026-09-07 — Ready for review
 
 Source: Marijus's human-performed end-to-end verification on 2026-09-07. A local OCI console connection was created using a dedicated RSA key, the serial console was reached successfully, and interactive login as `marijus` using the local Linux password succeeded.
@@ -216,8 +571,8 @@ The listed verification commands were `whoami` and `sudo whoami`, without captur
 |---|---|
 | SSH and accounts | Human hardening report confirms the six effective settings, fresh marijus/ubuntu key sessions, ubuntu passwordless sudo, and root rejection; owner subsequently verified marijus sudo entitlement `(ALL : ALL) ALL` using `sudo -l -U marijus`; account-specific SSH policy checks remain unverified |
 | Recovery | Owner tested ubuntu key login/passwordless sudo and, separately, end-to-end OCI Serial Console login as marijus with the local Linux password on 2026-09-07. Serial Console provides recovery access independent of normal SSH; arbitrary OS/boot repair is not claimed |
-| OCI networking | Actual security-list/NSG rules and their attachment/effective exposure have not been recorded |
-| Host / containers | Listeners and negative runtime/package/PATH checks recorded above; firewall rules, dormant/custom workloads, and complete container-installation status remain unverified |
+| OCI networking | Human Console evidence above records primary VNIC, subnet, route, no NSGs, ephemeral public IP, and default Security List ingress. Default-list egress is human-reported unrestricted IPv4/stateful; Mac TCP 22 succeeded and TCP 111/80/443 timed out. Final human evidence recorded September 8 confirms exactly one attached list and stateful ingress; Section 3 is closed Human accepted. Gateway enabled flag and broader reachability remain unverified within the completion limits above |
+| Host / containers | Listeners, firewall technology, and saved rules recorded in the network assessment above; loaded filter rules were subsequently supplied by Marijus, with the UDP 123 live-rule representations subsequently verified consistent by the owner. Earlier saved-file evidence remains historical; no fresh persistence comparison is claimed. Dormant/custom workloads and complete container-installation status remain unverified |
 | DNS / TLS / application | DNS/TLS uninspected; no application workload identified in the point-in-time views above, not an exhaustive deployment audit |
 | Secrets | No storage/delivery mechanism selected; never put secret values in this inventory or verification output |
 | Persistent data | OS/account state and package metadata backups observed; application data not identified in inspected paths. Owner confirms no pre-existing application/user data needs preservation; protected paths remain uninspected. Future application-data backup policy/restore capability remain open |
