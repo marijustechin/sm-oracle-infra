@@ -10,15 +10,9 @@ The six-file documentation baseline and basic secret-handling rules are Human ac
 
 ## 4. Docker host
 
-- [ ] Establish current Docker installation state before changes
-- [ ] Install Docker Engine from official repository if needed; verify Ubuntu release and ARM64 compatibility
-- [ ] Install Docker Compose plugin
-- [ ] Decide Docker administration privileges before granting access; conventional rootful Docker-group membership effectively grants host-root control
-- [ ] Verify ARM64 Docker support
-- [ ] Configure Docker log rotation
-- [ ] Define container restart policy
-- [ ] Decide Docker data/storage layout
-- [ ] Verify host forwarding/NAT and Docker-published ports with OCI rules; keep direct application/database ports private
+Docker Engine, Compose and Buildx are installed and verified [Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted). The approved sudo administration model, default storage locations, bounded local logging and restart guidance are recorded. No application or test containers/images remain. Installation is complete; future deployment exposure verification remains:
+
+- [ ] Verify container forwarding/NAT and Docker-published ports with OCI rules for the actual deployment; keep direct application/database ports private. Recheck after any authorized firewall reload/reboot before claiming persistence.
 
 ## 5. Demo application architecture
 

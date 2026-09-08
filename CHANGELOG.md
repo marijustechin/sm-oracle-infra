@@ -2,6 +2,26 @@
 
 ## 2026-09-08
 
+### Docker host installed and verified — Human accepted
+
+Implemented the owner-approved rootful Docker target on sokoladas-demo. September 8 preflight at 10:01:35 UTC reconfirmed Resolute/ARM64, no conflicting packages, space and SSH access. Added the official scoped Docker key/deb822 source, authenticated APT metadata and reviewed the simulation. Installed exactly five packages at 10:02:39–10:02:56 UTC: docker-ce/docker-ce-cli 29.8.0, containerd.io 2.3.4, Buildx 0.37.0 and Compose 5.5.1, all arm64. No package removals/upgrades or optional runtime/management packages. Created daemon.json before auto-start: default Docker data-root, local logs, 10m × 3 files, compression. Retained default containerd storage and both LXD packages unchanged.
+
+Verified through 10:04:34 UTC: Docker/containerd enabled and active, CLI/server ARM64, intended roots, effective local log options inherited by an official ARM64 hello-world container, empty docker group and denied marijus access without sudo, fresh SSH, unchanged public listener inventory and no failed units. Removed the test container/image; zero containers, images, volumes and build cache remain. Updated current README/inventory and removed completed Section 4 TODO items; actual deployment forwarding/published-port verification remains unfinished. Approved restart guidance is documented; no application deployed.
+
+Docker's automatic startup enabled IPv4 forwarding, changed its FORWARD default to DROP and added bridge/NAT/forwarding chains. Host INPUT/InstanceServices and original FORWARD REJECT were preserved; saved IPv4/IPv6 rules and SSH hardening hashes match preflight. No manual firewall policy, OCI, DNS, SSH or Section 6 web-exposure changes. The default containerd config dump emitted a legacy-version migration warning but succeeded; no rewrite was needed and service journals had no warning-or-higher entries in the inspected interval. A local retained SSH shell lacked writable stdin; fresh post-install sessions verified access instead.
+
+Verification includes package transaction/origins, daemon JSON validation, runtime/architecture/log configuration assertions, cleanup, LXD package verification, network comparisons, documentation diff, shell/JSON syntax and relative links/whitespace. No reboot/reload, bridge egress/published-port, rotation stress or rollback test is claimed. Historical observations remain preserved. No commit or push occurred during implementation.
+
+Acceptance recorded 2026-09-08: Marijus explicitly accepted the Section 4 Docker host implementation and documentation, superseding the earlier assessment/proposal review status. Docker-managed runtime bridge/NAT changes and required future published-port verification remain unchanged. Final repository checks cover the accepted diff, local links, shell/JSON syntax, whitespace and preservation of remaining TODO work. No additional live changes; the owner authorized committing the accepted changes without pushing.
+
+### Section 4 Docker assessment and implementation proposal — Ready for review
+
+Performed authorized read-only SSH inspection of sokoladas-demo on September 8, 09:34:12–09:36:49 UTC. marijus sudo required authentication; the owner explicitly approved ubuntu read-only sudo, which succeeded. Recorded runtime/package/service/socket state, APT sources/keyring inventory, storage and standard data-root paths, users/rootless prerequisites, journald and Docker-relevant forwarding state. No Docker/containerd/runc/Podman installation found; LXD installer packages and its active activation socket are present, not a running LXD runtime. No evidence proves Docker data-root was never created historically.
+
+Verified official Docker support for Resolute/arm64 against documentation and the public package index. Proposed exact package versions, sudo-based rootful administration without group grants, default Docker/containerd storage locations, bounded local logs, restart guidance, installation/ARM64 checks and withdrawal considerations. Compared rootless and docker-group alternatives; all target choices and live commands remain proposals. Updated README and replaced the completed initial inventory TODO with review/approval and fresh-preflight work; Section 4 remains open.
+
+Verification: cross-checked live views, package dependencies and public compatibility evidence; reviewed documentation diff, proposed shell/JSON syntax, relative links and whitespace. No APT refresh, runtime invocation, software/service/configuration/network/group changes, secret collection, commit or push. Normal SSH/sudo audit effects remain. No installation, rootless execution, container networking, reboot persistence, rotation stress test or rollback result is claimed. Assessment and plan are Ready for review, not Human accepted.
+
 ### Section 3 closed on final human OCI evidence — Human accepted
 
 Recorded Marijus's confirmation that public-subnet has exactly one attached Security List, Default Security List for demo-vnc, with Console pagination `1 - 1 of 1 total items`, and that the earlier ingress evidence showed Stateless: No for the recorded rules. This resolves the final attachment/statefulness task without independent OCI inspection.

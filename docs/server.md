@@ -4,6 +4,323 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## Docker host installed and verified — 2026-09-08 — Human accepted
+
+The owner approved the Section 4 rootful Docker target and live installation. Implemented on `sokoladas-demo` (`152.70.25.153`) with preflight at **10:01:35 UTC**, repository setup at **10:02:10–10:02:15 UTC**, package installation at **10:02:39–10:02:56 UTC**, and verification through **10:04:34 UTC**. Administrative commands ran through ubuntu SSH with sudo; no credentials, sudoers, group memberships or SSH configuration were changed. This result supersedes the earlier assessment's absent-runtime state and pending target choices. Marijus explicitly accepted the Section 4 Docker host implementation and its documentation on 2026-09-08. It is Human accepted.
+
+### Access, prerequisites and LXD disposition
+
+Fresh marijus SSH succeeded before installation and again at 10:03:52 UTC afterward. An attempted retained shell had closed local stdin, so it is not counted as a continuously usable fallback; fresh connections verified access. Ubuntu SSH/sudo also worked before and after installation. The owner's September 7 tested OCI Serial Console path remains the recorded independent recovery method: dedicated console key/connection, then interactive marijus login. No new console or arbitrary boot-repair test is claimed.
+
+Rechecked Ubuntu **26.04.1 LTS / resolute**, kernel `7.0.0-1010-oracle`, `aarch64`, dpkg `arm64`, approximately 40 GiB free root ext4 space, no existing Docker/data/config paths, and no installed conflicting packages. The only prior APT source was ubuntu.sources and /etc/apt/keyrings was empty. Repository refresh authenticated the Docker InRelease through the scoped key without errors. Simulation and installation both reported **exactly five new packages, zero upgrades and zero removals**. The install fetched 77.1 MB and estimated 334 MB added package storage; no optional rootless extras, pigz, alternative runtime or management layer was installed.
+
+The final read-only LXD preflight at **09:58:41–09:59:07 UTC** established only `lxd-installer` 14ubuntu0 and `lxd-agent-loader` 0.13ubuntu0. `lxd-installer.socket` is enabled/active/listening, root:lxd 0660, at its distinct `/run/lxd-installer.socket`; no installer service instance runs. `lxd-agent.service` is static/inactive. No LXD runtime, bridge, container namespace, data mount/path or TCP/UDP listener was found. The wrappers can activate snap installation and were not invoked. No Docker/containerd file, socket or declared package conflict exists. A removal simulation would also remove ubuntu-server because it depends on lxd-installer; removing about 53 KiB of package payload provides no Docker benefit. Both packages and their files were retained unchanged; post-install `dpkg --verify` returned no differences and the socket remains active. No removal or deactivation occurred.
+
+### Installed configuration and versions
+
+| Package | Installed version | Architecture |
+|---|---|---|
+| docker-ce | `5:29.8.0-1~ubuntu.26.04~resolute` | arm64 |
+| docker-ce-cli | `5:29.8.0-1~ubuntu.26.04~resolute` | arm64 |
+| containerd.io | `2.3.4-2~ubuntu.26.04~resolute` | arm64 |
+| docker-buildx-plugin | `0.37.0-1~ubuntu.26.04~resolute` | arm64 |
+| docker-compose-plugin | `5.5.1-1~ubuntu.26.04~resolute` | arm64 |
+
+Source: `https://download.docker.com/linux/ubuntu`, suite resolute, component stable, architecture arm64; key downloaded from `/linux/ubuntu/gpg` to `/etc/apt/keyrings/docker.asc`. Both key and `/etc/apt/sources.list.d/docker.sources` are root:root 0644. The existing Ubuntu sources remain in place. The deb822 source contents are:
+
+```text
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: resolute
+Components: stable
+Architectures: arm64
+Signed-By: /etc/apt/keyrings/docker.asc
+```
+
+Created `/etc/docker/daemon.json` (root:root 0644) **before package auto-start**, with the approved bounded local policy:
+
+```json
+{
+  "data-root": "/var/lib/docker",
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3",
+    "compress": "true"
+  }
+}
+```
+
+`python3 -m json.tool` passed before installation and `dockerd --validate --config-file=/etc/docker/daemon.json` returned `configuration OK` afterward. Container stdout/stderr rotation is approximately 30 MiB uncompressed per container plus overhead; it does not cap images, volumes, application log files or host-wide disk use. Journald policy was not changed. Application containers created later inherit this policy unless explicitly overridden.
+
+Storage uses `/var/lib/docker` and the package-default `/var/lib/containerd`, on the existing ext4 boot filesystem. Docker reports **overlayfs**, `io.containerd.snapshotter.v1`, systemd cgroup driver, cgroup v2, AppArmor and seccomp. No legacy overlay2 override, separate volume or custom containerd configuration was introduced. The packaged `/etc/containerd/config.toml` disables CRI and leaves root/state defaults; `containerd config dump` resolved root `/var/lib/containerd` and state `/run/containerd`. That read-only command emitted a legacy configuration migration warning for the package's versionless file; it succeeded, services are healthy, and no migration rewrite was performed. Post-cleanup `du` reported 240K Docker and 268K containerd metadata; `df` reported 5.2G used, 39G available, 12% used on root.
+
+Administration remains **sudo Docker**. The package-created docker group is GID 987 with no supplementary members; marijus remains in marijus/sudo/users only. Socket ownership/mode is root:docker 0660. A fresh marijus `docker -H unix:///var/run/docker.sock ps` returned permission denied, as expected. Rootless Docker and docker-group grants were not selected. Existing ubuntu passwordless recovery access remains; this scoped execution does not grant general future agent/deployment authority.
+
+The approved restart guidance remains `unless-stopped` for future long-running Compose services and `"no"` for one-shot/migration/test containers. No application has been deployed and no container restart policy is implied by enabling the Docker service. Future application readiness, retries and persistence tests remain deployment work.
+
+### Executed installation and verification
+
+The earlier assessment below records the exact repository setup and configuration commands; they were executed with root privileges through sudo, without overwriting pre-existing Docker configuration. After `apt-get update` and review of the identical `--simulate` transaction, the actual installation used:
+
+```bash
+sudo apt-get --yes --no-install-recommends --no-remove install \
+  'docker-ce=5:29.8.0-1~ubuntu.26.04~resolute' \
+  'docker-ce-cli=5:29.8.0-1~ubuntu.26.04~resolute' \
+  'containerd.io=2.3.4-2~ubuntu.26.04~resolute' \
+  'docker-buildx-plugin=0.37.0-1~ubuntu.26.04~resolute' \
+  'docker-compose-plugin=5.5.1-1~ubuntu.26.04~resolute'
+```
+
+Package scripts enabled and started Docker/containerd automatically; no extra enable/start/restart was necessary. debconf fell back to its noninteractive frontend in the SSH session and completed successfully; no unrelated service restart was requested by needrestart. The exact versions are a recorded installation choice, not permanent apt holds.
+
+| Verification | Result |
+|---|---|
+| `systemctl is-enabled/is-active` | docker.service, docker.socket and containerd.service all enabled/active; both services running with ExecMainStatus 0 |
+| `sudo docker version` | Client/server 29.8.0, both linux/arm64; containerd v2.3.4; bundled runc 1.5.1 |
+| `sudo docker info` | aarch64, `/var/lib/docker`, local logging, overlayfs containerd snapshotter; no application workload |
+| `sudo docker compose version` | v5.5.1 |
+| `sudo docker buildx version` | v0.37.0 |
+| Official ARM64 test | `hello-world:latest`, `--platform=linux/arm64 --network=none --restart=no`, named section4-hello; exited 0, arm64v8 success output |
+| Test inspection | Image linux/arm64; inherited LogConfig exactly local with compress=true, max-file=3, max-size=10m; no port bindings |
+| Cleanup | `docker rm section4-hello`, then `docker image rm hello-world:latest` succeeded. `docker system df`: zero images, containers, volumes and build cache |
+| Health | dpkg audit empty, zero failed units, no warning-or-higher Docker/containerd journal entries in the inspected installation interval |
+| Access / listeners | Fresh marijus and ubuntu SSH succeeded; privileged ss inventory unchanged: wildcard TCP 22 only, existing loopback DNS/chrony and interface-bound DHCP. No new public listener or Docker TCP API |
+
+The temporary official image digest was `hello-world@sha256:5dd0d3e6e255913fc30f90b9f2b1d359cc2cbdb48090cc4b65f1676e203243cc`; it was removed, not retained as deployment state. No Alpine or application image was needed. Successful registry pull verifies the daemon's outbound path; the network-none test does not verify container bridge egress or DNS.
+
+### Docker-managed network changes and preserved policy
+
+Docker's approved normal startup changed **runtime networking**: IPv4 ip_forward 0 → 1, docker0 `172.17.0.1/16`, IPv4 FORWARD default ACCEPT → DROP, and DOCKER-USER/DOCKER-FORWARD jumps before the existing unconditional FORWARD REJECT. Docker added its bridge filtering and IPv4 masquerade rule; no published-port DNAT rules exist. IPv6 gained Docker forwarding/NAT chain scaffolding; host INPUT/OUTPUT/FORWARD defaults remain ACCEPT and enp0s6 remains link-local-only. These observed automatic changes must not be described as “no firewall changes.” No manual firewall policy edit, flush, save, restore or web-port opening occurred.
+
+The host INPUT sequence, OUTPUT InstanceServices jump and InstanceServices rules were unchanged, including destination-restricted UDP 123. Original FORWARD REJECT remains. Before/after SHA-256 equality verified saved files and SSH hardening:
+
+| File | Unchanged SHA-256 |
+|---|---|
+| `/etc/iptables/rules.v4` | `02bef6508e4f471a2d6ffffe849c3ad04ad87c9a101ab4785c18054d041d63b2` |
+| `/etc/iptables/rules.v6` | `3036493195a2ecb860f6754089857d1b75e21f24b87187d63ee8346a147b4eb5` |
+| `/etc/ssh/sshd_config.d/90-sokoladas-hardening.conf` | `aac5c7c061dcf3e61d7c38bcab5506d8b75a1ac597fc1184ccba3c01499b7b10` |
+
+Existing OCI/default/link-local routes remain; no OCI, DNS, SSH policy or Section 6 exposure changes were made. The accepted Section 3 baseline remains closed. **Section 4 retains its future container forwarding/published-port verification task**: this installation verifies the empty host baseline, not application port privacy under a future Compose deployment. Evaluate OCI rules, Docker forwarding/NAT and actual port bindings together then. No reboot, firewall reload, external all-port scan, container DNS/egress test, log-rotation stress test or rollback was performed; enabled units are not proof of tested post-reboot behavior.
+
+All requested installation checks passed. The implementation and documentation are Human accepted as of 2026-09-08. This acceptance supersedes the earlier assessment/proposal review status without changing its historical evidence. Docker-managed runtime bridge/NAT rules and required future published-port verification remain recorded above. Acceptance involved repository checks only, with no additional live changes; the owner authorized a commit but no push.
+
+
+## Section 4 Docker host assessment and proposed implementation — 2026-09-08 — Ready for review
+
+**Historical assessment and proposal, preceding the approved installation above; Section 4 retains deployment verification work.** No runtime was installed or invoked, and no service, repository, configuration, group, or firewall was changed. The proposed target and commands below require a subsequent human decision and scoped live authorization.
+
+### 1. Observed state
+
+Authorized SSH inspection of `sokoladas-demo` at `152.70.25.153`, September 8 **09:34:12–09:36:49 UTC**. Initial login was marijus using the established Oracle key with BatchMode, IdentitiesOnly, strict host-key checking, and host-key updates disabled. `sudo -n -l` required interactive authentication. Marijus then explicitly authorized using ubuntu's passwordless sudo for these read-only checks; `sudo -n` succeeded there. No authentication settings changed. Local sandbox/network retries were approved. Normal SSH/sudo audit logging and access-time effects were not suppressed.
+
+| Area | Established observation |
+|---|---|
+| OS / architecture | Ubuntu 26.04.1 LTS, `resolute`; kernel `7.0.0-1010-oracle`, `aarch64`; dpkg architecture `arm64`, no foreign architectures returned |
+| Runtime packages / commands | No installed Docker Engine/CLI, containerd, runc, Podman, crun, Buildah, Incus, Kubernetes runtime, RootlessKit, slirp4netns, or uidmap package in the scoped dpkg listing. PATH checks found no docker/dockerd/containerd/ctr/runc/podman/crun/nerdctl/buildah/incus/k3s/kubelet/newuidmap/newgidmap/rootlesskit/slirp4netns |
+| Services / sockets | docker.service, docker.socket, containerd.service, podman.service and podman.socket are `not-found`/inactive. No corresponding system unit files, marijus user units, runtime processes, or runtime Unix sockets found. The process-name substring match `runcommand` belongs to OCI's agent, not runc |
+| LXD exception | `lxd-installer` **14ubuntu0** and `lxd-agent-loader` **0.13ubuntu0** installed; matching versions available from Ubuntu resolute/main. `/usr/sbin/lxc` and `/usr/sbin/lxd` belong to lxd-installer. `lxd-installer.socket` is enabled/active/listening at `/run/lxd-installer.socket`, mode 0660 root:lxd; activation invokes the snap installer. `lxd-agent.service` is static/inactive. No LXD snap/data/runtime observed. Installer commands and socket were deliberately not invoked |
+| Snap / custom locations | Snap lists only core18, oracle-cloud-agent, snapd. `/usr/local/bin`, `/usr/local/sbin`, `/opt`, `/srv` empty. No Docker/Podman rootless data/config or Docker user service at the inspected standard paths under root, ubuntu, opc, or marijus; no `bin/docker` or `.local/bin/docker` there |
+| Docker storage / config | Privileged checks confirm `/var/lib/docker`, `/var/lib/containerd`, `/var/lib/containers`, `/var/snap/docker`, `/var/snap/lxd/common/lxd`, `/etc/docker`, `/etc/containerd`, `/etc/containers`, `/run/docker.sock`, `/run/containerd` absent |
+| Filesystem capacity | `/var/lib` and `/home` share `/dev/sda1`, ext4, mounted `/`; disk 46.6 GiB, root partition 45.6 GiB. `df -hT` rounds root to 45G, 4.8G used, 40G available, 11% used. 5,831,991 free inodes, 3% used. No separate Docker/data filesystem observed |
+| Administration | marijus UID 1002, groups marijus/sudo/users; ubuntu UID 1001, groups ubuntu/adm/cdrom/sudo/dip/lxd. No docker/podman/containerd group returned. Existing ubuntu recovery access already provides passwordless root control; this assessment's permission does not extend to future mutations |
+| Rootless prerequisites | cgroup v2; systemd 259.5; dbus-user-session installed. marijus has 65,536 subordinate UIDs and GIDs starting at 231072; `Linger=no`. User namespaces enabled, maximum 43,362; AppArmor restriction enabled. AppArmor enabled and `/etc/apparmor.d/rootlesskit` allows userns for `/usr/bin/rootlesskit`. uidmap/helpers and rootless runtime missing. user@1002.service reports delegation of cpu/memory/pids, but was inactive in the later session; its live cgroup path was absent, so effective runtime delegation remains untested. Unprivileged ports begin at 1024 |
+| Kernel prerequisites | Kernel config includes namespaces, user namespaces, cgroups, memory/cpuset controls, seccomp and netfilter; overlayfs, bridge and veth built as modules. No module loading or container execution tested |
+| Existing network policy | iptables 1.8.11 uses nf_tables; netfilter-persistent enabled. Loaded FORWARD policy ACCEPT with unconditional REJECT rule; IPv4 forwarding is 0. Docker startup will change forwarding/NAT/bridge state and needs separate approval and verification; the accepted Section 3 baseline stays closed |
+| Journald / syslog | Merged journald config has no explicit size/retention overrides; packaged commented defaults include Storage=persistent, rate limit 10,000/30s and no maximum retention age. Active vendor override `ForwardToSyslog=yes`; rsyslog active. Persistent and runtime journal directories exist. Root `journalctl --disk-usage`: 48M; unprivileged 11.6M was only the readable subset. Journal directory uses about 49M. No Docker-specific journald constraint configured |
+| Package health | No held packages or dpkg audit findings; zero failed systemd units. No policy-rc.d file. Read-only APT/dpkg history search returned no Docker/containerd/runc/Podman/LXD install/remove/upgrade match in retained logs; only current September 6 logs exist |
+
+**Was Docker data-root ever created?** It is absent now and no evidence of earlier creation/installation was found in the retained logs or standard paths. This cannot establish “never”: deleted directories and missing older logs leave no guaranteed trace. No full-disk forensic search, arbitrary executable scan, private Docker credential/context inspection, or exhaustive custom-path audit was performed.
+
+APT configuration: `/etc/apt/sources.list` is comments only. The only file in sources.list.d is `ubuntu.sources`, with `resolute`, `resolute-updates`, `resolute-backports` at `http://eu-frankfurt-1-ad-3.clouds.archive.ubuntu.com/ubuntu/` and `resolute-security` at `http://security.ubuntu.com/ubuntu`; all use main/universe/restricted/multiverse and `/usr/share/keyrings/ubuntu-archive-keyring.gpg`. `/etc/apt/keyrings` is empty; no Docker source/key exists in inspected locations. trusted.gpg is absent; trusted.gpg.d contains the Ubuntu 2012 cdimage and 2018 archive keys. Shared keyrings are Ubuntu/cloud-image/Ubuntu Pro keys. Only Ubuntu Pro ESM preference files exist (priority 510); no Docker pin. Key contents/fingerprints were not audited. No `apt update` ran; APT policy is from existing cache, with update/security InRelease timestamps on September 8.
+
+Installed prerequisites and available source versions agree in APT policy; this identifies available origins, not historical download provenance:
+
+| Package | Installed version | Available matching origin |
+|---|---|---|
+| curl | 8.18.0-1ubuntu2.4 | resolute-updates/security main |
+| ca-certificates | 20260601~26.04.1 | resolute-updates/security main |
+| libc6 | 2.43-2ubuntu2.3 | resolute-updates/security main |
+| libseccomp2 | 2.6.0-2ubuntu5 | resolute main |
+| apparmor | 5.0.2-0ubuntu1~26.04.1 | resolute-updates main |
+| dbus-user-session | 1.16.2-2ubuntu4 | resolute main |
+| iptables / nftables | 1.8.11-2ubuntu3 / 1.1.6-1 | resolute main |
+
+Docker CE/CLI have no installed version/candidate; no official plugin/containerd.io candidate was returned. Ubuntu alternatives are available but uninstalled: docker.io 29.1.3-0ubuntu4.1, containerd 2.2.2-0ubuntu1.1, runc 1.4.0-0ubuntu1, podman 5.7.0+ds2-3build1. No observed package conflict needs removal. LXD installer presence is an incidental activation risk, not evidence that Docker requires its removal; retain it for this proposal and avoid invoking it.
+
+### 2. Compatibility findings
+
+Checked Docker's public sources on September 8. The [official Ubuntu installation guide](https://docs.docker.com/engine/install/ubuntu/) explicitly lists Ubuntu Resolute 26.04 LTS and arm64. Linux `aarch64` maps to APT `arm64`; use suite **resolute**, never substitute noble. Existing libc6/libseccomp meet the published dependencies. Actual runtime compatibility with this OCI kernel still needs installation tests.
+
+The [official Resolute stable ARM64 package index](https://download.docker.com/linux/ubuntu/dists/resolute/stable/binary-arm64/Packages), downloaded locally over HTTPS without touching server APT state, includes these concrete proposed versions:
+
+| Package | Published arm64 version |
+|---|---|
+| docker-ce / docker-ce-cli | `5:29.8.0-1~ubuntu.26.04~resolute` |
+| containerd.io | `2.3.4-2~ubuntu.26.04~resolute` |
+| docker-buildx-plugin | `0.37.0-1~ubuntu.26.04~resolute` |
+| docker-compose-plugin | `5.5.1-1~ubuntu.26.04~resolute` |
+| docker-ce-rootless-extras (alternative only) | `5:29.8.0-1~ubuntu.26.04~resolute` |
+
+This establishes published release/architecture packages, not an installed or signature-verified transaction. Future APT must authenticate the repository metadata and simulate exact dependencies. containerd.io conflicts with distro containerd/runc and bundles the needed runtime; do not install both. Compose is the `docker compose` CLI plugin, regardless of its current major version; no standalone legacy docker-compose. Buildx supports future container builds without a host Node.js/pnpm runtime. No convenience script, Docker Desktop, management layer, or alternate orchestrator is proposed.
+
+### 3. Decisions requiring human approval
+
+**Recommended direction: rootful Docker with human `sudo docker ...`, no added docker-group members.** This is a proposal, not an approved privilege or deployment policy.
+
+| Model | One administrator / one VM | AI access and future scripts | Assessment |
+|---|---|---|---|
+| Rootful, `sudo docker ...` | Straightforward system service, conventional Compose and ports 80/443; deliberate human sudo step | General Docker access remains root-equivalent when granted. Avoid NOPASSWD Docker rules. Human can run reviewed deployment scripts with sudo; unattended deployment authorization remains a later decision | Recommended for current scope and minimal operation |
+| Rootful, marijus in docker group | Saves typing/password prompts, same daemon and networking | Every process/agent with that login gains continuous root-equivalent Docker control. Writable Compose files, host mounts, privileged containers and socket access defeat naive command allowlists | Convenience does not justify the standing grant here |
+| Rootless Docker | Technically realistic with this kernel, ext4, cgroup v2 and subordinate IDs; adds uidmap, rootless extras, user service and lingering | Reduces daemon host-root privilege, but an agent under the same account still controls that account's containers, data and files. Dedicated non-sudo deployment identity could improve separation later | Viable alternative if isolation is prioritized; requires a revised installation plan and deliberate low-port/network/resource testing |
+
+Docker documents [root-level docker-group privileges](https://docs.docker.com/engine/install/linux-postinstall/). `sudo` is an operational gate, not an AI security sandbox: marijus has broad sudo entitlement and cached credentials may matter; ubuntu's passwordless recovery path already exists. Tool authorization and credential access must remain scoped. Do not automatically reuse ubuntu for future deployment or grant agents a Docker socket. A future unattended script needs an explicit trust model; unrestricted Docker/Compose under sudo is effectively host-root access even if wrapped in a script.
+
+[Rootless prerequisites](https://docs.docker.com/engine/security/rootless/) require uidmap helpers and subordinate IDs. [Rootless operational guidance](https://docs.docker.com/engine/security/rootless/tips/) covers lingering and privileged ports; this VM's 1024 threshold means binding 80/443 needs a separately approved capability/port approach. Keep the reverse proxy in a container; do not add a host proxy merely to work around this choice. [Ubuntu rootless guidance](https://docs.docker.com/engine/security/rootless/troubleshoot/) supports the packaged AppArmor profile, already present here; do not disable AppArmor/user-namespace restrictions. Rootless container AppArmor limitations and resource/network behavior require validation; profile presence alone does not prove a working rootless daemon.
+
+Other proposed choices to approve together:
+
+- **Storage:** retain local ext4 on the existing boot disk; no extra volume/cost or partition change. Explicit Docker data-root `/var/lib/docker`; retain containerd's `/var/lib/containerd`. Fresh Engine 29 uses the [containerd image store](https://docs.docker.com/engine/storage/containerd/); images/snapshots are there, while Docker volumes/config remain under Docker's root. [Changing data-root does not relocate containerd](https://docs.docker.com/engine/daemon/). Keep the default snapshotter; do not force legacy overlay2. Use named volumes for later persistent services after backup decisions; image layers/build cache/logs share the roughly 40 GiB free space and are not a backup. Review disk usage before builds, retain headroom, and plan capacity once image/data sizes are known. No automated prune or data deletion.
+- **Logs:** `local`, `max-size=10m`, `max-file=3`, compression enabled, about 30 MiB uncompressed rotation budget per container plus overhead. This limits stdout/stderr logs, not application files, images, volumes, or total host usage. Read via `docker logs`; no external logrotate over Docker files. The [local driver](https://docs.docker.com/engine/logging/drivers/local/) supports rotation/compression. Daemon service logs still go to journald; leave existing journal policy for now, with host-wide retention under maintenance. No extra log collector. [Logging defaults affect newly created containers](https://docs.docker.com/engine/logging/configure/); retained delivery mode is blocking, so backpressure remains possible.
+- **Restart behavior:** future long-running Compose services use `restart: unless-stopped`, preserving intentional stops; one-shot migrations and verification containers use `restart: "no"`. Restart policy is per container, not a daemon-wide restart setting. Docker/containerd start at boot. [Restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/) do not restart a merely unhealthy but running process or replace application retry/readiness logic. No systemd unit per application container.
+- **Network/startup:** approve rootful package service auto-start, boot enablement and Docker-managed bridge/NAT/forwarding changes. Keep the iptables backend with the existing iptables-nft tools, preserve InstanceServices, and publish no ports during initial installation. Do not set `iptables=false`, open OCI/web ports, flush rules, or save Docker's transient rules through netfilter-persistent. [Docker inserts forwarding chains](https://docs.docker.com/engine/network/firewall-iptables/); inspect their ordering against the host's unconditional FORWARD REJECT. Verify again after any firewall reload/reboot in a separately approved test. A network conflict is a stop-and-review finding, not permission to remove the REJECT.
+
+### 4. Exact proposed live steps — NOT EXECUTED
+
+These steps implement only the recommended rootful target after approval. They are review material, not an executable repository bootstrap yet. Run as the human administrator on `sokoladas-demo`; use Bash and stop on errors. Before access-affecting installation, retain a working marijus session, confirm the ubuntu fallback and owner-tested OCI Serial Console remain available and understood. The recorded recovery evidence is dated September 7, not a fresh console test. If recovery is unavailable, do not proceed. Success includes a fresh marijus SSH session afterward.
+
+**A. Recheck identity, conflicts, storage and recovery before any mutation.** Review output; changed facts require revising this plan. Capture firewall evidence outside public logs, without credentials. Do not rewrite saved rules.
+
+```bash
+set -euo pipefail
+hostname
+. /etc/os-release
+test "$ID" = ubuntu
+test "$VERSION_CODENAME" = resolute
+test "$(dpkg --print-architecture)" = arm64
+sudo -v
+df -hT /var/lib
+df -i /var/lib
+sudo iptables-save
+sudo ip6tables-save
+sudo cat /etc/iptables/rules.v4 /etc/iptables/rules.v6
+ip -4 route
+sysctl net.ipv4.ip_forward
+systemctl --failed --no-pager
+dpkg-query -W -f='${binary:Package} ${db:Status-Abbrev} ${Version}\n' \
+  | grep -E '^(docker|containerd|runc|podman|crun)' || true
+```
+
+No conflicting package is currently installed. If a conflict appears, stop for its workload/removal review; there is no blanket uninstall step. Confirm default Docker address pools do not collide with any newly added local/VPN routes. Existing OCI 10.0.0.0/26 does not itself conflict with the conventional Docker 172.17.0.0/16 bridge; verify the allocated subnet afterward.
+
+**B. Add only Docker's scoped key/repository, refresh metadata and review the exact install simulation.** Existing curl/ca-certificates are sufficient. Fail if destination configuration already exists; do not overwrite a later setup. No global apt upgrade, repository substitution or automatic removals.
+
+```bash
+sudo test ! -e /etc/apt/keyrings/docker.asc
+sudo test ! -e /etc/apt/sources.list.d/docker.sources
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod 0644 /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<'SOURCES'
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: resolute
+Components: stable
+Architectures: arm64
+Signed-By: /etc/apt/keyrings/docker.asc
+SOURCES
+sudo apt-get update
+apt-cache policy docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+engine_version='5:29.8.0-1~ubuntu.26.04~resolute'
+containerd_version='2.3.4-2~ubuntu.26.04~resolute'
+buildx_version='0.37.0-1~ubuntu.26.04~resolute'
+compose_version='5.5.1-1~ubuntu.26.04~resolute'
+sudo apt-get --simulate --no-install-recommends install \
+  "docker-ce=$engine_version" "docker-ce-cli=$engine_version" \
+  "containerd.io=$containerd_version" "docker-buildx-plugin=$buildx_version" \
+  "docker-compose-plugin=$compose_version"
+```
+
+Stop on repository authentication errors, missing versions, removals or unexpected dependency changes. Review the displayed download/disk budget and arm64 origins before installation. Exact versions make this transaction reviewable, not a permanent hold; future upgrades need deliberate review. `--no-install-recommends` avoids adding unused rootless extras and other optional packages; installed AppArmor/certificates remain available. Buildx and Compose are explicitly selected despite being recommendations in some package metadata.
+
+**C. Configure logging/storage before package auto-start, then install.** This creates new configuration only. Validate JSON before installation; daemon semantic validation follows once the binary exists. Package installation may start services and modify kernel networking immediately; that behavior must be part of live approval.
+
+```bash
+sudo test ! -e /etc/docker
+sudo install -d -m 0755 /etc/docker
+sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
+{
+  "data-root": "/var/lib/docker",
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3",
+    "compress": "true"
+  }
+}
+JSON
+sudo chmod 0644 /etc/docker/daemon.json
+python3 -m json.tool /etc/docker/daemon.json >/dev/null
+sudo apt-get --no-install-recommends install \
+  "docker-ce=$engine_version" "docker-ce-cli=$engine_version" \
+  "containerd.io=$containerd_version" "docker-buildx-plugin=$buildx_version" \
+  "docker-compose-plugin=$compose_version"
+sudo dockerd --validate --config-file=/etc/docker/daemon.json
+sudo systemctl enable --now containerd.service docker.service
+```
+
+Use the same Bash session for B/C variables. No usermod, sudoers change, Docker TCP listener, custom containerd configuration or firewall rewrite is part of this proposal.
+
+**D. Verify installation, native ARM64 and the new network state.** These future container commands create/pull data and run workloads; they were not used in the assessment. Obtain approval for both named smoke-test containers, retaining them stopped for inspection rather than silently deleting them.
+
+```bash
+dpkg-query -W -f='${binary:Package} ${Version} ${Architecture}\n' \
+  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl is-active docker.service containerd.service
+sudo systemctl is-enabled docker.service containerd.service
+sudo docker version
+sudo docker info
+sudo docker compose version
+sudo docker buildx version
+sudo stat -c '%a %U:%G %n' /run/docker.sock
+getent group docker
+sudo docker run --name section4-hello --restart=no --network=none \
+  --platform=linux/arm64 hello-world:latest
+sudo docker run --name section4-arm64 --restart=no --network=none \
+  --platform=linux/arm64 alpine:latest uname -m
+sudo docker image inspect hello-world:latest alpine:latest \
+  --format '{{.Os}}/{{.Architecture}} {{json .RepoDigests}}'
+sudo docker inspect section4-hello section4-arm64 \
+  --format '{{.Name}} exit={{.State.ExitCode}} log={{json .HostConfig.LogConfig}} restart={{json .HostConfig.RestartPolicy}} ports={{json .HostConfig.PortBindings}}'
+sudo docker logs section4-hello
+sudo docker ps -a
+sudo docker system df
+sudo du -sh /var/lib/docker /var/lib/containerd
+df -hT /var/lib
+sudo docker network inspect bridge
+sudo iptables-save
+sudo ip6tables-save
+sysctl net.ipv4.ip_forward
+sudo ss -lntup
+sudo journalctl -u docker.service -u containerd.service --since '15 minutes ago' --no-pager
+systemctl --failed --no-pager
+```
+
+Expect both test exits 0, native `aarch64`, image `linux/arm64`, daemon ARM64, expected package versions, `local` logging with the proposed options, data-root `/var/lib/docker`, and the containerd snapshotter reported by Docker info. Record actual pulled digests; floating tags are scoped smoke-test inputs, not deployment pins. No emulation/binfmt installation. Socket must not be world accessible (normally root:docker 0660), docker group must not include marijus/ubuntu, and no TCP Docker API or application port should appear. No-group access can be checked with `docker -H unix:///var/run/docker.sock ps` as marijus: permission denied is the expected boundary.
+
+Review firewall deltas and bridge routes; verify InstanceServices and saved files unchanged, SSH still works in a fresh session, and no unexpected failed units. The smoke tests use no network and do not verify container egress, port publishing, or restart-after-reboot behavior. Those remain explicit Section 4 checks: approve a concrete bridge/DNS/egress and private/published-port test with the actual intended OCI/host path, and a maintenance-window reboot/reload test if persistence is to be claimed. Do not open 80/443 early to complete Docker installation. Inspect configured rotation now; an actual rotation stress test and application restart/readiness tests require later scoped workloads.
+
+### 5. Rollback and removal considerations — NOT AUTHORIZED
+
+Before the first install, the relevant daemon/source/key paths are absent; record if that changes. A failed transaction can leave packages, services, config and networking partly installed. Inspect `dpkg --audit`, service status and sanitized logs first. Do not treat stopping Docker as restoration of the previous host firewall/forwarding state.
+
+A separately approved withdrawal would first inventory containers/volumes and preserve any data that now matters, then stop/disable docker.service **and docker.socket** plus containerd.service only after checking consumers. Simulate removal of the five explicitly installed packages; review effects before removing them. Do not purge unrelated packages, autoremove, delete data roots, prune volumes or flush firewall rules. Package removal does not automatically remove `/var/lib/docker` or `/var/lib/containerd`; their preservation is intentional. Removing the new source/key/config or smoke-test containers is a separately scoped cleanup, not a blanket command in this plan. Snapshotter/data-format changes make arbitrary downgrade unsafe; verify version compatibility and use backups when needed.
+
+Recheck SSH, service state, forwarding and the complete OCI/host path after withdrawal. Never restore old saved rules blindly or save transient Docker chains with netfilter-persistent. Keep the documented ubuntu/Serial Console recovery path available. No rollback, stop/start, removal or reboot was tested during this assessment.
+
+Verification of this documentation: cross-checked package/PATH evidence with systemd, sockets, snap and protected standard paths; distinguished LXD installer activation from a runtime; checked filesystem and privilege prerequisites; compared official Ubuntu support with the published ARM64 package index; reviewed proposed commands, JSON, links, diff and whitespace. No secrets, private keys, process environments or application data collected. Section 4 remains unfinished and proposals await human review. No live administrative changes, commit or push.
+
 ## Section 3 closed on human OCI evidence — recorded 2026-09-08 — Human accepted
 
 Source: Marijus's final human-supplied OCI Console evidence, recorded September 8. Exact Console observation times were not supplied; no independent agent OCI or live verification occurred.
@@ -572,7 +889,7 @@ The listed verification commands were `whoami` and `sudo whoami`, without captur
 | SSH and accounts | Human hardening report confirms the six effective settings, fresh marijus/ubuntu key sessions, ubuntu passwordless sudo, and root rejection; owner subsequently verified marijus sudo entitlement `(ALL : ALL) ALL` using `sudo -l -U marijus`; account-specific SSH policy checks remain unverified |
 | Recovery | Owner tested ubuntu key login/passwordless sudo and, separately, end-to-end OCI Serial Console login as marijus with the local Linux password on 2026-09-07. Serial Console provides recovery access independent of normal SSH; arbitrary OS/boot repair is not claimed |
 | OCI networking | Human Console evidence above records primary VNIC, subnet, route, no NSGs, ephemeral public IP, and default Security List ingress. Default-list egress is human-reported unrestricted IPv4/stateful; Mac TCP 22 succeeded and TCP 111/80/443 timed out. Final human evidence recorded September 8 confirms exactly one attached list and stateful ingress; Section 3 is closed Human accepted. Gateway enabled flag and broader reachability remain unverified within the completion limits above |
-| Host / containers | Listeners, firewall technology, and saved rules recorded in the network assessment above; loaded filter rules were subsequently supplied by Marijus, with the UDP 123 live-rule representations subsequently verified consistent by the owner. Earlier saved-file evidence remains historical; no fresh persistence comparison is claimed. Dormant/custom workloads and complete container-installation status remain unverified |
+| Host / containers | Listeners, firewall technology, and saved rules recorded in the network assessment above; loaded filter rules were subsequently supplied by Marijus, with the UDP 123 live-rule representations subsequently verified consistent by the owner. Earlier saved-file evidence remains historical; no fresh persistence comparison is claimed. September 8 Docker installation above establishes the rootful runtime, default data roots, bounded local logging and unchanged LXD installer. Docker added its runtime forwarding/NAT chains; saved firewall files remain unchanged. Future container publishing and reboot/reload behavior remain unverified |
 | DNS / TLS / application | DNS/TLS uninspected; no application workload identified in the point-in-time views above, not an exhaustive deployment audit |
 | Secrets | No storage/delivery mechanism selected; never put secret values in this inventory or verification output |
 | Persistent data | OS/account state and package metadata backups observed; application data not identified in inspected paths. Owner confirms no pre-existing application/user data needs preservation; protected paths remain uninspected. Future application-data backup policy/restore capability remain open |
