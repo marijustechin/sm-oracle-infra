@@ -6,18 +6,6 @@ Items are unfinished planned work, not approved architectural decisions or autho
 
 Necessary manual server changes must be documented, with reproducible scripts/configuration added where practical. Implemented and verified items are removed in the reviewable diff and recorded in [CHANGELOG.md](CHANGELOG.md); this does not imply human acceptance.
 
-The six-file documentation baseline and basic secret-handling rules are Human accepted. Section 5 architecture is [Human accepted](docs/application-architecture.md) and closed; operational implementation and secret delivery remain open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
-
-## 4. Docker host — Human accepted (closed)
-
-Docker Engine 29.8.0, Compose 5.5.1 and Buildx 0.37.0 are installed and verified on ARM64 with the approved sudo administration, default storage, bounded local logging and restart guidance ([Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted)). The deferred deployment verification is now complete via Section 6 evidence: Docker port publication on TCP 80/443 was exercised and externally verified, the DNAT/FORWARD path was inspected, a controlled reboot confirmed Docker/containerd enabled+active with `restart: unless-stopped` containers auto-returning and 80/443 publications restored, saved firewall/`sshd`/`InstanceServices` remained unchanged, and no unintended public Docker ports appeared. The only remaining exposure check is the future application deployment (frontend/API/PostgreSQL port privacy), which belongs to Section 7.
-
-## 6. Domain and HTTPS — Human accepted (closed)
-
-Section 6 is complete and **Human accepted**: reserved public IPv4 (`79.76.117.246`) and DNS, the HTTP bootstrap, staging-CA and production Let's Encrypt issuance, HTTPS activation (canonical apex/www 308 redirects, apex maintenance 503, ACME HTTP-01 preserved), the containerized renewal loop and hourly certificate watcher, the isolated certificate replacement/reload test, and reboot persistence. Evidence and procedures are in the [HTTPS runbook](docs/https-runbook.md) and [inventory](docs/server.md).
-
-Two operational follow-ups are preserved and are **not** Section 6 implementation work: (1) the first real on-schedule Let's Encrypt production renewal before the current certificate expires (2026-12-07), and (2) the reserved OCI public IPv4 pricing/status follow-up (tracked in the README open decisions).
-
 ## 7. Deployment
 
 - [ ] Implement the accepted prebuilt ARM64 image delivery model; select registry/build environment and verify image access/pins
@@ -51,6 +39,8 @@ Resolve applicable backup needs before introducing valuable persistent data. Dem
 - [ ] Security update strategy
 - [ ] Disk usage alerts
 - [ ] Document routine maintenance
+- [ ] Confirm the first real on-schedule Let's Encrypt production renewal succeeds before the certificate expires (2026-12-07); the unattended loop has not yet performed a real renewal
+- [ ] Confirm reserved OCI public IPv4 pricing/billing treatment; no spending limit or cost-check cadence is yet in place
 
 ## 10. Disaster recovery
 
