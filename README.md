@@ -79,6 +79,7 @@ The network/firewall baseline (TODO Section 3) is closed **Human accepted** on t
 | [docs/https-runbook.md](docs/https-runbook.md) | Section 6 certificate/HTTPS/renewal runbook and rollback (review only) |
 | [docs/http-bootstrap-runbook.md](docs/http-bootstrap-runbook.md) | Section 6 group-4 HTTP bootstrap runbook (Human accepted) |
 | [docs/application-architecture.md](docs/application-architecture.md) | Accepted Section 5 architecture, alternatives and implementation prerequisites |
+| [docs/application-deployment-contract.md](docs/application-deployment-contract.md) | Section 7 image/deployment contract, image delivery model, and blockers |
 | [TODO.md](TODO.md) | Unfinished work and prerequisites; no execution authorization |
 | [CHANGELOG.md](CHANGELOG.md) | Historical work, verification, limitations, and review status for new entries |
 | [.gitignore](.gitignore) | Narrow local exclusions for secrets and generated artifacts |

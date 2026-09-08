@@ -8,6 +8,8 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
+The [application deployment contract](docs/application-deployment-contract.md) defines the interface to the application repository, the recommended image delivery model (GHCR + GitHub Actions buildx, ARM64-only, digest-pinned), and the blockers that must be resolved first. The items below remain unfinished until the application supplies the §5 answers.
+
 - [ ] Implement the accepted prebuilt ARM64 image delivery model; select registry/build environment and verify image access/pins
 - [ ] Obtain application image contracts: ports, /api ownership, health/migration commands, UIDs, write paths and file-secret support
 - [ ] Verify PG18 compatibility with selected ORM/extensions before initialization
