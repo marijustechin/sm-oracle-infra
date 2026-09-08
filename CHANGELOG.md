@@ -2,6 +2,30 @@
 
 ## 2026-09-08
 
+### Section 5 application architecture accepted and closed — Human accepted
+
+Marijus explicitly accepted the Section 5 architecture, including the final edge/app/db capability policy, canonical apex/www redirects, containerized Certbot renewal and hourly Nginx certificate checks. Recorded acceptance throughout the current design/README and removed completed Section 5 design TODOs. No unresolved architectural decision remains in Section 5; executable image contracts, PostgreSQL compatibility, registry selection, secret provisioning/custody, state-retention decisions and runtime verification remain explicit prerequisites in Sections 6–8. Closure does not authorize data loss or claim implementation readiness without these checks.
+
+Verification: reviewed the complete documentation diff, local links, whitespace, absence of secret material, unchanged server inventory and retention of unfinished implementation work. No Compose, scripts or live changes. Human authorized committing the accepted documentation without pushing. Earlier entries below preserve the review history and superseded proposals; this acceptance applies to the final architecture only.
+
+### Section 5 network, canonical hostname and containerized TLS revision — Ready for review
+
+Recorded the human-directed edge/app/db policy: API has no initial outbound Internet capability; a separate egress network is deferred until an actual approved integration needs it. Recorded sokoladas.eu as canonical, permanent www-to-apex and HTTP-to-HTTPS redirects with the ACME challenge exception. Updated the in-principle approved containerized Nginx/Certbot model, replacing the earlier host timer with a renewal loop and proposing hourly certificate-content checks plus a narrowly scoped, independently testable validation/reload operation. Shared certificate/challenge storage remains unchanged. Other architecture contracts retain their status; Section 5 is not accepted or closed.
+
+Verification: reviewed service/network memberships, TLS lifecycle, redirect/bootstrap consistency, remaining decisions, local links and whitespace. No Compose, scripts or live changes; docs/server.md unchanged. No runtime verification, commit or push. Earlier entries preserve the superseded proposals as history.
+
+### Section 5 Nginx decision and revised TLS proposal — Ready for review
+
+Recorded the human-approved Nginx choice: administrator familiarity, explicit conventional configuration and transparency are primary; resource efficiency is secondary. Revised the proposal with a short-lived Certbot webroot job, root-owned renewal timer/reload sequence, bootstrap and redirect behavior, explicit apex/www handling, shared certificate/challenge volumes, Nginx worker-readable access secret, DNS resolution and health checks. Nginx is accepted; this TLS workflow and remaining architecture are still proposals. Replaced the resolved proxy-selection TODO with unfinished TLS workflow work; Section 5 remains open.
+
+Verification: reviewed documentation consistency, local links, whitespace and scope against the accepted inventory; consulted primary Certbot/Nginx documentation. No Compose or runtime configuration created, no live systems accessed, no commit or push; no runtime or exact Certbot ARM64-image verification claimed. Earlier proposal entry below records the initial proposal before this decision.
+
+### Section 5 architecture proposal — Ready for review
+
+Added a clearly proposed demo architecture and linked it from README/TODO: four long-running services in one Compose project, Caddy versus Nginx comparison, explicit application/database/egress networks, persistent DB/TLS state, conditional uploads, restricted per-service file secrets, health/migration/restart contracts and prebuilt ARM64 image delivery. The proposed server layout keeps secrets outside release/configuration files and application source outside this repository. Staging access, data, payment and email defaults and the genuine approval/application-contract blockers are explicit; no target decision is recorded as accepted.
+
+Verification: compared the proposal with the accepted Section 4 baseline and public primary documentation, including current Nginx ACME support, PostgreSQL 18 volume layout, Next.js build/runtime environment behavior and Compose file-secret permission limits. Reviewed service/network/secret/volume consistency, links, whitespace and preservation of all existing TODO tasks and server inventory. No Compose/Dockerfile/Caddyfile implementation, application code, live server/OCI/DNS access, application-repository access, commit or push. No deployment/runtime verification is claimed. Section 5 remains open; this design is Ready for review, not Human accepted.
+
 ### Docker host installed and verified — Human accepted
 
 Implemented the owner-approved rootful Docker target on sokoladas-demo. September 8 preflight at 10:01:35 UTC reconfirmed Resolute/ARM64, no conflicting packages, space and SSH access. Added the official scoped Docker key/deb822 source, authenticated APT metadata and reviewed the simulation. Installed exactly five packages at 10:02:39–10:02:56 UTC: docker-ce/docker-ce-cli 29.8.0, containerd.io 2.3.4, Buildx 0.37.0 and Compose 5.5.1, all arm64. No package removals/upgrades or optional runtime/management packages. Created daemon.json before auto-start: default Docker data-root, local logs, 10m × 3 files, compression. Retained default containerd storage and both LXD packages unchanged.

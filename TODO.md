@@ -6,7 +6,7 @@ Items are unfinished planned work, not approved architectural decisions or autho
 
 Necessary manual server changes must be documented, with reproducible scripts/configuration added where practical. Implemented and verified items are removed in the reviewable diff and recorded in [CHANGELOG.md](CHANGELOG.md); this does not imply human acceptance.
 
-The six-file documentation baseline and basic secret-handling rules are Human accepted. Operational secret delivery remains open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
+The six-file documentation baseline and basic secret-handling rules are Human accepted. Section 5 architecture is [Human accepted](docs/application-architecture.md) and closed; operational implementation and secret delivery remain open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
 ## 4. Docker host
 
@@ -14,25 +14,12 @@ Docker Engine, Compose and Buildx are installed and verified [Human accepted](do
 
 - [ ] Verify container forwarding/NAT and Docker-published ports with OCI rules for the actual deployment; keep direct application/database ports private. Recheck after any authorized firewall reload/reboot before claiming persistence.
 
-## 5. Demo application architecture
-
-- [ ] Define services:
-  - [ ] frontend
-  - [ ] API
-  - [ ] PostgreSQL
-  - [ ] reverse proxy
-- [ ] Define Docker networks
-- [ ] Define persistent volumes
-- [ ] Decide secret storage/delivery/access/rotation/recovery and environment configuration before deploying services needing secrets
-- [ ] Add health checks
-- [ ] Decide staging audience/access, demo data, outbound email, and payment sandbox behavior before enabling applicable capabilities
-
 ## 6. Domain and HTTPS
 
-- [ ] Decide root domain vs `demo.sokoladas.eu` and API naming
+- [ ] Confirm the application /api routing contract under approved canonical `sokoladas.eu`
 - [ ] Decide dynamic versus reserved addressing and verify relevant existing DNS before changes
 - [ ] Point the chosen hostname(s) to the authorized OCI address after those decisions
-- [ ] Choose Caddy or Nginx before installing/configuring the reverse proxy
+- [ ] Implement the accepted Nginx/Certbot container workflow with hourly certificate checks; include certificate persistence, bootstrap and approved apex/www redirects
 - [ ] At web deployment, separately approve and verify TCP 80/443 ingress across OCI and the host/container path; keep UDP 443 and TCP/UDP 111 outside public policy
 - [ ] Enable HTTPS
 - [ ] Verify HTTP -> HTTPS redirect
@@ -40,8 +27,12 @@ Docker Engine, Compose and Buildx are installed and verified [Human accepted](do
 
 ## 7. Deployment
 
-- [ ] Define deployment strategy
-- [ ] Decide whether server pulls from GitHub or CI pushes
+- [ ] Implement the accepted prebuilt ARM64 image delivery model; select registry/build environment and verify image access/pins
+- [ ] Obtain application image contracts: ports, /api ownership, health/migration commands, UIDs, write paths and file-secret support
+- [ ] Verify PG18 compatibility with selected ORM/extensions before initialization
+- [ ] Implement Compose services, accepted edge/app/db networks, persistent volumes, initialization and health checks
+- [ ] Provision per-service secrets, confirm recovery custody and verify access/rotation
+- [ ] Implement and verify invited staging access and disabled uploads/email/payments; separately approve any integration and required egress
 - [ ] Create deployment user/process if needed
 - [ ] Add deploy script
 - [ ] Add rollback procedure

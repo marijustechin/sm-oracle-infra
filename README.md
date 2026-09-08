@@ -14,16 +14,18 @@ Human decision → scoped task → implementation → verification and documenta
 
 The platform direction is a single OCI ARM64 VM with a minimal Ubuntu host, Docker Engine, and Docker Compose. Keep application runtimes and databases in containers. Host software should be limited to administration utilities, Git where needed, Docker, and justified security/backup/monitoring tooling.
 
-The candidate application layout is:
+The accepted application layout is:
 
 ```text
 Internet HTTP/HTTPS → chosen DNS hostname → OCI public address
-    → container reverse proxy (Caddy or Nginx)
+    → container reverse proxy (Nginx)
         → Next.js frontend
         → NestJS API → PostgreSQL
 ```
 
-Next.js/NestJS and the exact service layout remain provisional. PostgreSQL is the default database direction, containerized if used. Redis is only a possible internal service, not an approved dependency. Node.js/pnpm belong in application build/runtime containers. Public web traffic enters through the reverse proxy; SSH is a separate administrative service. Intended public ports are 22/tcp, 80/tcp, and 443/tcp; internal application/database ports must remain private. The owner reports verified SSH hardening: public-key authentication enabled, password/keyboard-interactive authentication and direct root login prohibited; evidence is recorded in [docs/server.md](docs/server.md).
+Next.js frontend, NestJS API and containerized PostgreSQL are accepted service boundaries; application image contracts remain to be verified. Redis is only a possible internal service, not an approved dependency. Node.js/pnpm belong in application build/runtime containers. Public web traffic enters through the reverse proxy; SSH is a separate administrative service. Intended public ports are 22/tcp, 80/tcp, and 443/tcp; internal application/database ports must remain private. The owner reports verified SSH hardening: public-key authentication enabled, password/keyboard-interactive authentication and direct root login prohibited; evidence is recorded in [docs/server.md](docs/server.md).
+
+The [Section 5 application architecture](docs/application-architecture.md) is **Human accepted** and Section 5 is closed. It defines one Compose project with Nginx, Next.js, NestJS and PostgreSQL plus a Certbot renewal container; edge/app/db networking without initial API Internet access; restricted file secrets; prebuilt ARM64 images; apex/www redirects; and hourly certificate checks. Implementation/provisioning prerequisites remain in TODO Sections 6–8. No Compose configuration or application deployment is claimed.
 
 ## Decisions and open questions
 
@@ -36,8 +38,12 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Documented baseline / date unrecorded | Only SSH and web ports intended publicly; private internal service ports | Limit exposure; source restrictions remain open |
 | Documented baseline / date unrecorded | Human architectural decisions and review; scoped agent implementation | Marijus remains the decision maker |
 | Approved plan / 2026-09-07 | Separate repository/live authorization; explicit approval for destructive/access-breaking actions; lightweight review lifecycle | Remediation plan approved; implementation is Human accepted |
-| Open | Root/www versus demo/API subdomains; dynamic versus reserved public address | Choose before changing DNS; `sokoladas.eu` is the documented available domain |
-| Open | Caddy versus Nginx; final frontend/API/database layout | Candidate services are not a final application architecture |
+| Owner decision / 2026-09-08 | Canonical HTTPS sokoladas.eu; www permanently redirects to apex; HTTP redirects except ACME HTTP-01 | Certificate covers both names; DNS/exposure implementation remains pending |
+| Owner decision / 2026-09-08 | edge: Nginx/Certbot; internal app: Nginx/frontend/API; internal db: API/PostgreSQL/migrate | No initial API Internet access; add dedicated egress only for an actual approved integration |
+| Human accepted / 2026-09-08 | Containerized Nginx/Certbot renewal | Hourly certificate-check wrapper accepted; no host renewal timer |
+| Open | Dynamic versus reserved public address | Resolve and inspect DNS before changes |
+| Human accepted / 2026-09-08 | Nginx reverse proxy | Administrator familiarity, explicit conventional TLS/proxy configuration and transparency; containerized TLS and hourly checks accepted |
+| Human accepted / 2026-09-08 | Nginx + Next.js + NestJS + PostgreSQL in one Compose project | Service boundaries accepted; application artifacts and compatibility still require verification |
 | Owner decision / recorded 2026-09-07 | 2 GiB swapfile with swappiness 10; system locale `en_US.UTF-8`, timezone `Europe/Vilnius`; retain package-owned login locale behavior | Human changes/evidence and verification limits in [docs/server.md](docs/server.md); no additional host packages needed now, future installation is requirement-driven |
 | Approved / 2026-09-08 | Default Docker/containerd storage on existing ext4; local logs 10m × 3, compression; unless-stopped for future long-running services, no restart for one-shot jobs | Host configuration verified; application networks/volumes and persistence tests remain deployment work |
 | Owner decision / recorded 2026-09-07 | marijus primary administrator; ubuntu tested recovery administrator with passwordless sudo; retain opc | Human-reported key-login and forced-command tests in [docs/server.md](docs/server.md); OCI Serial Console recovery independently tested by the owner on 2026-09-07; evidence in docs/server.md |
@@ -47,14 +53,14 @@ This is a lightweight decision record, not an authorization to execute tasks. Ba
 | Owner direction / 2026-09-07 | Future web ingress TCP 80/443 only, alongside SSH; keep 111 and application/database ports nonpublic | Do not open web ports before the HTTP deployment needs them; Docker exposure requires separate verification |
 | Human-executed / recorded 2026-09-07 | rpcbind service and socket disabled and masked; packages retained | Owner reports both units masked/inactive, no port-111 listener, and refused local portmapper query; evidence and limitations in docs/server.md |
 | Approved / 2026-09-08 | Rootful Docker from the official Ubuntu repository; administration via sudo, no marijus docker-group membership | Engine, Compose and Buildx verified; no unattended deployment privilege granted. SSH user restrictions remain open |
-| Open | Secret storage, delivery, access, rotation, and recovery | Resolve before deploying services needing secrets; no secrets platform selected |
-| Open | Deployment/build strategy, CI responsibilities, deployment account, rollback | Application repositories and ARM64 build requirements still needed |
-| Open | Audience/access, demo data, outbound email, payment sandbox behavior | Resolve applicable staging constraints before enabling those capabilities |
+| Human accepted / 2026-09-08 | Root-managed per-service secret files and owner recovery copies | Provisioning, actual custody and rotation verification remain deployment prerequisites |
+| Human accepted / 2026-09-08 | Prebuilt ARM64 images, initial human sudo deployment | Registry/build environment, application contracts, CI and rollback implementation remain unfinished |
+| Human accepted / 2026-09-08 | Invited access, synthetic data; uploads/email/payments disabled initially | Any enabled integration needs separate approval, safe credentials and required egress |
 | Open | Spending limit and ongoing cost-check cadence | Initial human Console verification is recorded in [docs/server.md](docs/server.md); no spending limit or recurring cadence has been supplied |
 | Open | Persistent data worth keeping, backups, monitoring, updates | Resolve backups before introducing valuable persistent data |
 | Open | Rebuild scope for OCI resources themselves | Full rebuildability is the goal; starting from a new VM does not yet specify cloud provisioning |
 
-Possible DNS layouts previously considered are `sokoladas.eu` with `www.sokoladas.eu`, or `demo.sokoladas.eu` with `api.demo.sokoladas.eu`. Neither is selected.
+The canonical hostname is `sokoladas.eu`; `www.sokoladas.eu` permanently redirects to `https://sokoladas.eu`. DNS/address verification and authorized changes remain Section 6 work.
 
 ## Recorded state and documentation
 
@@ -67,6 +73,7 @@ The network/firewall baseline (TODO Section 3) is closed **Human accepted** on t
 | [AGENTS.md](AGENTS.md) | Workflow, authorization, and review rules |
 | [README.md](README.md) | Purpose, intended architecture, approved/open decisions |
 | [docs/server.md](docs/server.md) | Authoritative recorded inventory, observations, access/recovery notes, evidence |
+| [docs/application-architecture.md](docs/application-architecture.md) | Accepted Section 5 architecture, alternatives and implementation prerequisites |
 | [TODO.md](TODO.md) | Unfinished work and prerequisites; no execution authorization |
 | [CHANGELOG.md](CHANGELOG.md) | Historical work, verification, limitations, and review status for new entries |
 | [.gitignore](.gitignore) | Narrow local exclusions for secrets and generated artifacts |
