@@ -2,6 +2,10 @@
 
 ## 2026-09-09
 
+### Single-authoritative contract ownership documented — Ready for review
+
+Clarified in [docs/application-deployment-contract.md](docs/application-deployment-contract.md) that this file is the single authoritative deployment contract: the application repository keeps no local copy (its stale duplicate was removed in a coordinated cross-repository change) and reads this document from the parent workspace for context. Document ownership does not give infrastructure unilateral ownership of application-side decisions — the application repository supplies its own runtime requirements/facts (the C fields), while this repository records and consumes the reconciled interface. Documentation only; no deployment behavior, Compose model, Section 7 state, or contract content was otherwise changed.
+
 ### Section 7 deployment foundation prepared — Ready for review
 
 Resumed Section 7 using the application repository's Human-accepted initial scaffold, whose runtime facts are now confirmed: `linux/arm64`, frontend port 3000, API port 3001, `/api/*` owned by the API, `GET /health/ready` readiness for both services, runtime UID:GID 10001:10001, stateless/disposable frontend and API, foreground processes with graceful SIGTERM and no in-container supervisor, migrations reusing the API image via `prisma migrate deploy`, and PostgreSQL 18.

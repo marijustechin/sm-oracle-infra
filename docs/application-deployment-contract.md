@@ -35,6 +35,14 @@ Boundary rules:
 - Deployment to the Oracle host is a deliberate, reviewed action performed from the infrastructure side against digest-pinned images.
 - The application never publishes its own host ports; only the infrastructure-owned proxy publishes 80/443.
 
+This file is the **single authoritative deployment contract**. The application
+repository keeps no local copy and reads this document from the parent
+workspace's `sm-oracle-infra` for cross-repository context. Document ownership
+does not give infrastructure unilateral ownership of application-side
+decisions: the application repository supplies its own runtime
+requirements/facts (the application-owned C fields below), while this
+repository records and consumes the reconciled deployment interface.
+
 ## A. Accepted infrastructure decisions
 
 These are fixed and already accepted:
