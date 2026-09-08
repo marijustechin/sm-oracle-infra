@@ -1,0 +1,23 @@
+# Section 6 staging-CA override — review candidate only.
+# Replaces only Certbot's /etc/letsencrypt source with a dedicated test volume so
+# staging issuance never touches production certificate/account state. Nginx does
+# not mount this volume. Used together with compose.yaml for the staging-CA test:
+#   docker compose -f compose.yaml -f compose.ca-test.yaml run --rm --no-deps \
+#     --entrypoint certbot certbot certonly --non-interactive ... --server https://acme-staging-v02.api.letsencrypt.org/directory ...
+services:
+  certbot:
+    volumes:
+      - type: bind
+        source: ./certbot/run-renewal
+        target: /opt/certbot/run-renewal
+        read_only: true
+        bind:
+          create_host_path: false
+      - letsencrypt_staging:/etc/letsencrypt
+      - acme_webroot:/var/www/acme
+    tmpfs:
+      - /var/lib/letsencrypt:rw,size=64m,noexec
+      - /var/log/letsencrypt:rw,size=64m,noexec
+volumes:
+  letsencrypt_staging:
+    name: sokoladas-staging_letsencrypt_staging

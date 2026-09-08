@@ -2,6 +2,138 @@
 
 ## 2026-09-08
 
+### Section 6 domain, DNS and HTTPS accepted and closed — Human accepted
+
+Marijus explicitly accepted the complete Section 6 implementation on 2026-09-08, superseding the earlier Ready-for-review statuses: reserved public IPv4 and DNS, the HTTP bootstrap, staging-CA and production Let's Encrypt issuance, HTTPS activation with canonical apex/www redirects and maintenance 503, the containerized renewal loop and hourly certificate watcher, the isolated certificate replacement/reload test, and the reboot-persistence verification. Two operational follow-ups are explicitly preserved and are neither implementation blockers nor unfinished Section 6 work: (1) the first real on-schedule Let's Encrypt production renewal before the current certificate expires on 2026-12-07, and (2) the reserved OCI public IPv4 pricing/status follow-up (tracked in the README open decisions). No application deployment and no Section 7 work is authorized by this acceptance. No push.
+
+### Section 6 reboot persistence verified — Section 6 closed (Ready for review)
+
+Performed the approved controlled reboot of `sokoladas-demo` (human-assisted) and verified persistence end-to-end. Before-reboot baseline and after-reboot results match: the SSH host identity remained `SHA256:Qt7o7y7xOUccDssX6R5xGkOfQ0oKGaEYnQlsZ+0usLI`; the served certificate was unchanged (`CN=sokoladas.eu`, Let's Encrypt CN=YE2, 2026-09-08 → 2026-12-07, fingerprint `B9:5E:66:66…`); the saved firewall files `rules.v4`/`rules.v6` and `sshd -T` hashes were byte-identical; the Oracle `InstanceServices` chain was intact; Docker and containerd were enabled/active and the proxy (healthy) and certbot containers auto-returned with `0.0.0.0:80`/`443` restored, including the `nat DOCKER` DNAT rules to `172.18.0.2`. Externally after reboot: apex HTTPS 503, www 308, HTTP 308, ACME 404, TCP 443 reachable, TCP 111/3000/3001/5432 closed, fresh SSH succeeded.
+
+Section 6 (Domain and HTTPS) is closed — implementation complete and verified, Ready for review. A real on-schedule Let's Encrypt renewal (next due before 2026-12-07) and ongoing reserved-IPv4 pricing remain operational follow-ups and are not claimed as verified here. No application deployment, no OCI/DNS/firewall change, no commit or push.
+
+### Section 6 isolated certificate replacement/reload test executed and verified — Ready for review
+
+Executed the reviewed isolated watcher test (human-assisted) using [compose.certtest.yaml](https/compose.certtest.yaml) and the same `run-proxy`/`check-certificate`/`nginx.conf`. The test project published no host ports (`PortBindings {}`) and started with self-signed cert A: the initial fingerprint `6411cc95…` matched A's pair, and the isolated endpoint served A (`E3:80:E3:B1…`). Replacing the full pair with cert B produced the expected path — fingerprint change detected → `nginx -t` success → `nginx -s reload` → new fingerprint `231eee95…` recorded → served cert changed to B (`E8:5A:FF:65…`). Installing the mismatched pair (B certificate + A key) produced change detection then `nginx -t` failure (`key values mismatch`, exit 1) with no reload, the recorded fingerprint remaining B and the served certificate remaining B.
+
+Cleanup removed the container and network and deleted the state directory. Two transient shell issues occurred and were corrected: an SSH reconnect lost `$TEST_IP`, so one "served cert" check hit the production proxy (`B9:5E:66:66…`, the production certificate) instead of the test proxy; and a `down` with an empty release path failed once before being rerun correctly. After cleanup: production proxy healthy, Certbot renewal loop running, external apex HTTPS 503 / www 308 / HTTP 308 / ACME 404 correct, fresh SSH succeeds, no new public listener or Docker publication, and no leftover certtest container/network.
+
+This proves the complete watcher path for a locally replaced pair (detection, `nginx -t` gating every reload, an actual reload, stable-pair recording, rejection of an invalid pair). It does not prove a real Let's Encrypt renewal (ACME/HTTP-01/cadence) or reboot persistence. No reboot, no production certificate-state change, no ACME request, no OCI/firewall/application change, no commit or push.
+
+### Section 6 isolated certificate replacement/reload test designed — Ready for review (not executed)
+
+Prepared, for review only, the smallest safe isolated test that proves the complete proxy watcher path without a second Let's Encrypt certificate, without touching production certificate state, and without public exposure. Added [compose.certtest.yaml](https/compose.certtest.yaml) (separate `sokoladas-certtest` project, no published ports, the same reviewed `run-proxy`/`check-certificate`/`nginx.conf` via read-only binds, isolated host state dirs) and documented the procedure in [docs/https-runbook.md](docs/https-runbook.md) §8: generate two self-signed certificates, verify the initial fingerprint and served certificate, perform a valid replacement and observe `nginx -t` → reload → new fingerprint, then a mismatched pair and observe `nginx -t` failure with no reload and unchanged fingerprint/state, followed by full teardown.
+
+Documented what the test proves (fingerprint change detection, `nginx -t` gating every reload, an actual reload changing the served certificate, stable-pair recording, rejection of an invalid pair) and what it cannot prove (a real Let's Encrypt renewal, reboot persistence, the mid-reload race guard, full-chain parsing nuances). Verification: Compose parsing of the test manifest and documentation review. No execution, no reboot, no OCI/firewall/application change, no commit or push.
+
+### Section 6 production renewal-loop startup and verification — Ready for review
+
+Started the production Certbot renewal-loop service (human-assisted). The `certbot` container runs the reviewed `run-renewal` loop; its first cycle completed without error ("certbot renewal loop starting" → "certbot renewal cycle succeeded"; certificate not yet due, `expires on 2026-12-07 (skipped)`, no renewals attempted). A coordinated production-manifest `certbot renew --dry-run --non-interactive` reported "all simulated renewals succeeded". The proxy's `check-certificate` watcher reported "unchanged" (exit 0) against the currently served certificate, so no reload was attempted. The certbot container only exposes (does not publish) 80/443; only the proxy publishes `0.0.0.0:80`/`443`, and no host listener was added.
+
+Post-check: apex HTTPS 503, HTTPS www 308 to apex, HTTP apex 308, ACME HTTP-01 path 404, TCP 443 reachable, fresh hostname SSH succeeds. No reboot, no OCI/firewall change, no application deployment, no commit or push. Ready for review, not Human accepted. Verified here: loop startup, first-cycle success, renewal dry-run, unchanged-path watcher. Not proven: an actual production certificate replacement and the reload path (not exercised without a reviewed isolated valid-certificate test), and reboot persistence.
+
+### Section 6 HTTPS activation executed and verified — Ready for review
+
+Activated HTTPS (human-assisted). The first activation attempt crashed because `run-proxy` used `#!/bin/bash`, which `nginx:alpine` lacks: `exec /usr/local/bin/run-proxy` returned "no such file or directory" (exit 255), putting the proxy in a restart loop. HTTP was restored via the reviewed rollback, then `run-proxy` was corrected to POSIX `sh` (and `set -euo pipefail` → `set -eu`); `run-renewal` was converted to POSIX `sh` for the same reason (jitter via `date +%s`). After the fix, the one-shot `nginx -t` validated the full HTTPS config against the production certificate, and the proxy was recreated publishing `0.0.0.0:80:80` and `0.0.0.0:443:443`, healthy, with only sshd (22) and docker-proxy (80/443) listening.
+
+Marijus added the approved stateful OCI IPv4 TCP 443 rule (0.0.0.0/0), preserving existing rules. External verification passed: `https://sokoladas.eu/` returns 503 with the production certificate (CN=sokoladas.eu, Let's Encrypt CN=YE2, 2026-09-08 → 2026-12-07, SANs sokoladas.eu + www.sokoladas.eu); `https://www.sokoladas.eu/...` returns 308 to the same path/query on the apex; HTTP apex/www return 308 to the canonical HTTPS apex; the ACME HTTP-01 path returns 404 (not redirected); TCP 443 is reachable; TCP 111/3000/3001/5432 remain closed; fresh hostname SSH succeeds.
+
+No renewal-loop startup, no application deployment, no further OCI/firewall changes, no commit or push. Ready for review, not Human accepted; the production renewal loop and reboot-persistence verification remain separate gates.
+
+### Section 6 production certificate issuance executed and verified — Ready for review
+
+Executed the approved production-issuance gate only (single attempt, human-assisted sudo). Issued one Let's Encrypt production certificate named `sokoladas.eu` using the accepted containerized Certbot webroot model against the production `sokoladas-staging_letsencrypt` volume and the existing HTTP bootstrap webroot: `certbot certonly --non-interactive --agree-tos --email <owner-supplied> --server https://acme-v02.api.letsencrypt.org/directory --webroot -w /var/www/acme --cert-name sokoladas.eu -d sokoladas.eu -d www.sokoladas.eu`.
+
+Verification: `certbot certificates` shows `sokoladas.eu` with identifiers `sokoladas.eu www.sokoladas.eu` and expiry 2026-12-07 (`VALID: 89 days`, no staging marker); x509 inspection reports subject `CN=sokoladas.eu`, issuer `CN=YE2,O=Let's Encrypt,C=US`, validity 2026-09-08 → 2026-12-07, and SANs exactly `sokoladas.eu` and `www.sokoladas.eu`; the `live/sokoladas.eu` symlinks (`fullchain.pem`/`privkey.pem`/`cert.pem`/`chain.pem`) are present. `docker volume ls` now lists `sokoladas-staging_letsencrypt` alongside the separate `sokoladas-staging_letsencrypt_staging` and `acme_webroot`. The private key was not printed or captured.
+
+The HTTP bootstrap remained healthy externally (apex/www 503, missing-token 404), fresh SSH succeeded, and TCP 443 still timed out. No proxy recreation, no TCP 443 publication, no OCI 443 ingress, no HTTP→HTTPS redirect activation, no renewal-loop startup, no commit or push. Ready for review, not Human accepted; HTTPS activation (candidate `nginx -t`, proxy 443, OCI 443, redirects) and the renewal loop remain separately authorized later groups.
+
+### Section 6 staging-CA issuance gate executed and verified — Ready for review
+
+Executed the approved staging-CA gate only, human-assisted (agent: local, registry and non-privileged SSH checks; Marijus: all sudo steps). Staged the reviewed `https/` artifacts to `~/section6-https-review` (local↔remote SHA-256 matched all 7 files), installed root-owned to `/opt/sokoladas-staging/releases/section6-https-v1`, captured baseline evidence under `/root/section6-https-v1-evidence` (saved/runtime IPv4/IPv6, INPUT/OUTPUT/InstanceServices, listeners, sshd -T), pulled both pinned images and confirmed `linux/arm64`, and validated both Compose manifests (production and staging override).
+
+Issued a Let's Encrypt **staging** certificate with the isolated `sokoladas-staging_letsencrypt_staging` volume and the shared webroot: `certbot certonly --webroot -w /var/www/acme --cert-name sokoladas.eu -d sokoladas.eu -d www.sokoladas.eu` against the staging directory, using an owner-supplied contact email. Verification: `certbot certificates` reports both SANs (`sokoladas.eu`, `www.sokoladas.eu`), expiry 2026-12-07 and the `INVALID: TEST_CERT` staging marker; `renew --dry-run` reported all simulated renewals succeeded; `docker volume ls` lists only `sokoladas-staging_acme_webroot` and `sokoladas-staging_letsencrypt_staging`, so production `sokoladas-staging_letsencrypt` remains untouched; the running HTTP bootstrap stayed healthy externally (apex/www 503), fresh SSH succeeded, and TCP 443 still timed out.
+
+No production issuance, no TCP 443 publication, no OCI 443 ingress, no proxy replacement and no renewal-loop startup occurred. No commit or push. This gate is Ready for review, not Human accepted; production issuance and HTTPS activation remain separately authorized later groups.
+
+### Section 6 certificate, HTTPS and renewal implementation prepared — Ready for review
+
+Prepared the remaining Section 6 group (certificate issuance, HTTPS activation, renewal) for review only. No live, OCI, DNS or SSH action, and no commit or push.
+
+Added the `https/` release artifacts: a proxy+certbot [Compose manifest](https/compose.yaml) publishing only 80 and 443, a [staging-CA override](https/compose.ca-test.yaml) that replaces only Certbot's `/etc/letsencrypt` source with a disposable `sokoladas-staging_letsencrypt_staging` volume, nonsecret [image pins](https/images.env), the full [HTTP/TLS Nginx config](https/proxy/nginx.conf) (HTTP 308-to-apex except ACME, HTTPS apex 503, HTTPS www 308, unmatched-host 444), a [run-proxy](https/proxy/run-proxy) wrapper that preflights `nginx -t` before starting Nginx and runs Nginx as its only child with an inline one-shot hourly certificate-change checker (check failures logged and retried next interval; only Nginx termination exits the container), an independently testable [check-certificate](https/proxy/check-certificate) fingerprint/reload operation, and a [run-renewal](https/certbot/run-renewal) 12-hour Certbot loop with jitter. Pinned `certbot/certbot:v5.8.0` (multi-arch incl. linux/arm64) from public registry metadata; Nginx pin reused from the accepted bootstrap.
+
+Applied two owner-directed implementation corrections before live approval: (1) an explicit `nginx -t` preflight in `run-proxy` so the container fails before starting Nginx on an invalid configuration/certificate state; (2) reconciled the run-proxy comments and documentation with the actual simple one-shot hourly checker lifecycle — certificate-check failures are non-fatal, logged and retried next interval, and only unexpected Nginx termination exits the container, with no separate checker daemon. The accepted Section 5 wording was corrected to match.
+
+Wrote an exact [HTTPS runbook](docs/https-runbook.md) covering image/config validation, staging-CA issuance with isolated state, production issuance, candidate `nginx -t` validation with no published ports, ordered activation (proxy 443 before OCI 443), external/certificate/redirect/negative-port verification, renewal dry-run and certificate-change test, and a scoped rollback that withdraws only the OCI 443 rule and proxy 443 publishing. Updated the [Section 6 plan](docs/domain-https-plan.md), TODO and README to mark the group prepared-but-unexecuted.
+
+Verification: Compose parsing for both manifests (including the staging override's volume replacement), Bash/sh syntax and exec bits for the three scripts, and documentation links/whitespace. Certbot image entrypoint/state-path facts were read from registry metadata; the Certbot pin still requires a linux/arm64 pull check and the config still requires a real `nginx -t` after issuance. No issuance, TLS, renewal, reboot or rollback test is claimed. This entry is Ready for review, not Human accepted.
+
+### Section 6 HTTP bootstrap implemented and verified — Ready for review
+
+Completed the approved human-assisted TCP-80-only bootstrap: human OCI ingress addition and pinned ARM64 Nginx deployment, with no host INPUT/persistent-policy changes. External apex/www token 200, maintenance 503 and missing-token 404 passed; fresh hostname SSH succeeded, TCP 80 connected, and TCP 443/111/3000/3001/5432 timed out from the Mac. Docker DNAT and publication ACCEPT counters increased from zero to 13 packets; FORWARD processed 126 packets through Docker chains with empty DOCKER-USER and unchanged terminal REJECT count. Final saved-policy, INPUT/OUTPUT/InstanceServices and SSH comparisons passed; proxy healthy, only port 80 published. Human removed the documented token; both URLs returned 404 at 13:06:18 UTC.
+
+Reconciled inventory, README, plan and runbook; removed the completed bootstrap TODO while retaining TLS, renewal, future exposure and reboot verification. Fixed runbook SSH stdin handling for scripted checks. OCI screenshot attachment/egress visibility and source-specific probe limits remain explicit. No Certbot, TLS, application deployment, reboot or rollback test; Section 6 remains open. All privileged/live mutations were human-executed; no additional live action, commit or push. Local documentation/whitespace and helper syntax checks accompany this review; human acceptance remains pending.
+
+### Section 6 local HTTP and OCI TCP 80 evidence — bootstrap verification pending
+
+Recorded human apex/www token, maintenance 503 and missing-token 404 results. OCI screenshot shows four ingress rules including the approved stateful TCP 80 addition and existing SSH/ICMP, with no TCP 443. Description/OCID/attachment/egress visibility limits remain explicit. External forwarding verification and token cleanup are still required; no agent live action, commit or push.
+
+### Section 6 human proxy startup and structural firewall gate — bootstrap incomplete
+
+Recorded healthy Nginx bootstrap, only IPv4 port 80 publishing, edge 172.18.0.2, matching Docker DNAT/publication-specific forwarding rules and accepted bounded logs. Human comparisons establish unchanged saved host policy, INPUT/OUTPUT/InstanceServices and effective SSH policy. No structural mismatch with reviewed model; external traversal remains unverified until the later OCI/request/counter gate. No TCP 443, Certbot or application deployment. Token and OCI steps pending; no agent live execution, commit or push.
+
+### Section 6 human image/config validation — bootstrap incomplete
+
+Human evidence verifies the pinned Nginx linux/arm64 image, successful configuration test, Nginx 1.30.4/aarch64 and wget/grep availability. Compose created edge (bridge, IPv6 disabled, noninternal, no options) and the ACME volume; temporary validation containers were removed. No published proxy or OCI ingress change evidenced yet. Runtime forwarding and external checks remain pending; no agent live execution, commit or push.
+
+### Section 6 human file staging — execution evidence; bootstrap incomplete
+
+Recorded human creation of the root-owned section6-http-v1 release and root-only baseline evidence directory. Uploaded/release recursive comparisons and Compose parsing succeeded. Image/runtime validation, proxy startup, OCI TCP 80 and external verification remain pending. No firewall/SSH changes or agent live execution; no commit or push.
+
+### Section 6 human privileged preflight — evidence recorded; execution incomplete
+
+Reviewed human interactive-sudo output at 12:06:32 UTC: expected INPUT, empty DOCKER-USER, Docker jumps before FORWARD REJECT, no published DNAT, no containers/volumes or web listeners, accepted Docker logging and saved host policy. No material enforcement mismatch found. Preserved runtime-versus-saved Docker distinctions and pager-output limitation. Proceeding only to evidence/file staging; no deployment or OCI change verified. No agent live execution, commit or push in this evidence review.
+
+### Section 6 authorized bootstrap preflight evidence — Ready for review; execution incomplete
+
+Recorded successful strict-key SSH through sokoladas.eu at 12:00:17 UTC, sokoladas-demo/aarch64 identity, and marijus sudo requiring interactive authentication. Readable Docker logging configuration and service unit ordering were inspected. Execution awaits scoped sudo/recovery access and human coordination of the OCI Console step; no OCI connector/CLI/config is available here. No bootstrap files copied, images pulled, containers/tokens created, firewall/service changes, commit or push. TODO remains unfinished; this entry records preflight evidence, not completed implementation. Local Compose parsing, shell syntax and whitespace checks passed.
+
+### Section 6 Docker enforcement and TCP-80-only correction — Ready for review
+
+Revised bootstrap exposure to one stateful OCI TCP 80 addition and deliberate Docker port-80 publication. Removed unnecessary host INPUT mutations and all advance TCP 443 permissions. Existing host/netfilter-persistent policy stays unchanged; helpers now only read/compare and reject retired add/remove operations. Documented the recorded DNAT/FORWARD path, proposed OCI plus Docker controls versus custom DOCKER-USER policy, limitations and required actual rule/counter verification. No broad FORWARD permit, Oracle or Docker chain edits.
+
+Updated runbook/plan, verification and rollback: only bootstrap OCI TCP 80 and proxy publication are withdrawn; no manual host policy restoration. TCP 443 is a later HTTPS approval. Compose/Nginx behavior preserved. Local syntax, parsing, read-only comparison/refusal and documentation checks passed; no live inspection, packet trace, changes, commit or push. Earlier entries retain superseded proposal history.
+
+### Section 6 executable HTTP-bootstrap candidate — Ready for review
+
+Prepared a proxy-only Compose manifest, explicit maintenance/ACME Nginx config, two narrow runtime/saved-rule firewall helpers and an exact human execution/verification/rollback runbook. Pinned the official Nginx ARM64 manifest using public registry metadata. OCI/host TCP 80/443 allowances, Docker port-80 publishing and actual HTTP listening are distinguished; no 443 publishing or HTTPS readiness is claimed. DNS and addressing evidence were not reassessed. Certbot and application services remain excluded.
+
+Verification: local Compose parsing, shell syntax, saved-rule transformation/rollback tests and documentation checks. No live host/OCI changes or image/container execution; target Nginx config/runtime validation and recovery/firewall preflight remain explicit pre-exposure gates. No commit or push. Section 6 remains open; repository artifacts are review candidates, not evidence of deployment.
+
+### Section 6 hostname SSH identity evidence — Ready for review
+
+Recorded human successful existing-key SSH to sokoladas.eu (79.76.117.246), the exact ED25519 host fingerprint in docs/server.md, and OpenSSH recognition of that key for both the former ephemeral and current reserved addresses. This supplements DNS with verified SSH reachability/server identity; no HTTP/HTTPS or application readiness is inferred. Updated the Section 6 evidence without changing TODO completion or bootstrap approval scope. Documentation fingerprint transcription, local links and whitespace checked; no live access/changes, commit or push.
+
+### Section 6 DNS evidence and next HTTP-bootstrap approval package — Ready for review
+
+Recorded human Namecheap apex A/www CNAME changes and removal of parking CNAME/URL redirect. Mac A/AAAA evidence resolves both names to 79.76.117.246 with no IPv6 address; the accidental AAA query is excluded. Marked the DNS prerequisite complete and removed its completed TODOs without claiming worldwide propagation or independent testing.
+
+Prepared only the next live approval package: exact stateful OCI TCP 80/443 additions, tagged host INPUT equivalents and netfilter-persistent storage, minimal Nginx edge/port-80 model, ACME token routing, server/external checks and scoped rollback. The latest human instruction explicitly replaces pre-HTTPS redirects with maintenance 503; accepted redirects return at HTTPS activation. TCP 443 is policy-only now; Certbot issuance, TLS publishing and renewal remain separate. No UFW, firewall-model replacement or application changes.
+
+Verification: documentation consistency, local links/whitespace, human DNS-output interpretation and retained historical/accepted architecture evidence reviewed. Nginx snippet is proposed review text, not a deployed or runtime-tested file. No live access/changes, commit or push; Section 6 remains open.
+
+### Section 6 reserved public IPv4 evidence — Ready for review
+
+Recorded Marijus's completed stable-address change: reserved resource sokoladas-public-ip / 79.76.117.246 replaces ephemeral 152.70.25.153, assigned to unchanged primary private IPv4 10.0.0.52. Existing-key marijus SSH succeeded with the same ED25519 server identity. OCI displays the public address as Reserved while the same row says IP lifetime: Ephemeral; retained both observations without reclassifying the reserved address or inventing a cause.
+
+Updated inventory, Section 6 plan, README and remaining TODO work; completed allocation/cutover is not reopened. Human reports no DNS, firewall, Nginx, Docker or application changes. Pricing and broader verification are not inferred. Checked documentation consistency, links, whitespace and preservation of historical evidence/accepted architecture. No independent live access or additional live changes, commit or push; Section 6 remains open.
+
+### Section 6 domain, stable addressing and HTTPS plan — Ready for review
+
+Added an ordered assessment/implementation plan for an OCI reserved IPv4 on the existing VM, apex A/www CNAME records, exact web ingress semantics, proxy-only bootstrap/maintenance HTTPS, isolated staging-CA tests, trusted issuance, accepted container renewal/hourly reload checks and rollback. Explicit approval groups preserve SSH/Serial Console recovery, InstanceServices and Docker-owned firewall rules. Released ephemeral IPv4 is not a rollback destination; current price/quota and DNS evidence remain live-execution gates. sokoladas.online is reserved and untouched; application deployment is deferred.
+
+Verification: reviewed accepted Section 5 consistency, vendor documentation, sequencing, command placeholders, source/local links and whitespace. No live OCI/Namecheap/DNS/server assessment or mutations; no Compose/scripts or application artifacts created, no commit or push. Server inventory and accepted architecture are unchanged; Section 6 TODOs remain unfinished. Account-specific costs, recovery availability and runtime behavior are not newly verified.
+
 ### Section 5 application architecture accepted and closed — Human accepted
 
 Marijus explicitly accepted the Section 5 architecture, including the final edge/app/db capability policy, canonical apex/www redirects, containerized Certbot renewal and hourly Nginx certificate checks. Recorded acceptance throughout the current design/README and removed completed Section 5 design TODOs. No unresolved architectural decision remains in Section 5; executable image contracts, PostgreSQL compatibility, registry selection, secret provisioning/custody, state-retention decisions and runtime verification remain explicit prerequisites in Sections 6–8. Closure does not authorize data loss or claim implementation readiness without these checks.

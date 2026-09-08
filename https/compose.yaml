@@ -1,0 +1,69 @@
+# Section 6 HTTPS release — review candidate only; deployment requires explicit
+# human approval. Proxy publishes 80 and 443; certbot runs the accepted renewal
+# loop. Initial/staging issuance are one-shot `run --rm` invocations (see
+# docs/https-runbook.md), not this loop.
+name: sokoladas-staging
+services:
+  proxy:
+    image: nginx:1.30.4-alpine@sha256:aed159a7f218b47bbdc020b9c74dfcfb6825a67b00d3b2c14c34cd38025fe098
+    platform: linux/arm64
+    entrypoint: ['/usr/local/bin/run-proxy']
+    restart: unless-stopped
+    ports:
+      - '0.0.0.0:80:80'
+      - '0.0.0.0:443:443'
+    networks: [edge]
+    volumes:
+      - type: bind
+        source: ./proxy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/run-proxy
+        target: /usr/local/bin/run-proxy
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/check-certificate
+        target: /usr/local/bin/check-certificate
+        read_only: true
+        bind:
+          create_host_path: false
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme_webroot:/var/www/acme:ro
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:8080/health/ready | grep -qx ok']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+  certbot:
+    image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
+    platform: linux/arm64
+    entrypoint: ['/opt/certbot/run-renewal']
+    restart: unless-stopped
+    networks: [edge]
+    volumes:
+      - type: bind
+        source: ./certbot/run-renewal
+        target: /opt/certbot/run-renewal
+        read_only: true
+        bind:
+          create_host_path: false
+      - letsencrypt:/etc/letsencrypt
+      - acme_webroot:/var/www/acme
+    tmpfs:
+      - /var/lib/letsencrypt:rw,size=64m,noexec
+      - /var/log/letsencrypt:rw,size=64m,noexec
+networks:
+  edge:
+    driver: bridge
+    enable_ipv6: false
+volumes:
+  letsencrypt:
+    name: sokoladas-staging_letsencrypt
+  acme_webroot:
+    name: sokoladas-staging_acme_webroot

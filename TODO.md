@@ -10,20 +10,15 @@ The six-file documentation baseline and basic secret-handling rules are Human ac
 
 ## 4. Docker host
 
-Docker Engine, Compose and Buildx are installed and verified [Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted). The approved sudo administration model, default storage locations, bounded local logging and restart guidance are recorded. No application or test containers/images remain. Installation is complete; future deployment exposure verification remains:
+Docker Engine, Compose and Buildx are installed and verified [Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted). The approved sudo administration model, default storage locations, bounded local logging and restart guidance are recorded. The Docker installation test was cleaned up; Section 6 now runs the Nginx HTTP bootstrap. Installation is complete; future deployment exposure verification remains:
 
 - [ ] Verify container forwarding/NAT and Docker-published ports with OCI rules for the actual deployment; keep direct application/database ports private. Recheck after any authorized firewall reload/reboot before claiming persistence.
 
-## 6. Domain and HTTPS
+## 6. Domain and HTTPS — Human accepted (closed)
 
-- [ ] Confirm the application /api routing contract under approved canonical `sokoladas.eu`
-- [ ] Decide dynamic versus reserved addressing and verify relevant existing DNS before changes
-- [ ] Point the chosen hostname(s) to the authorized OCI address after those decisions
-- [ ] Implement the accepted Nginx/Certbot container workflow with hourly certificate checks; include certificate persistence, bootstrap and approved apex/www redirects
-- [ ] At web deployment, separately approve and verify TCP 80/443 ingress across OCI and the host/container path; keep UDP 443 and TCP/UDP 111 outside public policy
-- [ ] Enable HTTPS
-- [ ] Verify HTTP -> HTTPS redirect
-- [ ] Verify certificate renewal
+Section 6 is complete and **Human accepted**: reserved public IPv4 (`79.76.117.246`) and DNS, the HTTP bootstrap, staging-CA and production Let's Encrypt issuance, HTTPS activation (canonical apex/www 308 redirects, apex maintenance 503, ACME HTTP-01 preserved), the containerized renewal loop and hourly certificate watcher, the isolated certificate replacement/reload test, and reboot persistence. Evidence and procedures are in the [HTTPS runbook](docs/https-runbook.md) and [inventory](docs/server.md).
+
+Two operational follow-ups are preserved and are **not** Section 6 implementation work: (1) the first real on-schedule Let's Encrypt production renewal before the current certificate expires (2026-12-07), and (2) the reserved OCI public IPv4 pricing/status follow-up (tracked in the README open decisions).
 
 ## 7. Deployment
 

@@ -4,6 +4,149 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## Reboot persistence verified — Section 6 closed — 2026-09-08 — Human accepted
+
+A controlled reboot of `sokoladas-demo` was performed and persistence verified. Before/after comparisons: SSH host identity unchanged (`SHA256:Qt7o7y7xOUccDssX6R5xGkOfQ0oKGaEYnQlsZ+0usLI`); served certificate unchanged (`CN=sokoladas.eu`, `Let's Encrypt CN=YE2`, 2026-09-08 → 2026-12-07, fingerprint `B9:5E:66:66…`); saved `rules.v4`/`rules.v6` hashes identical (`02bef650…`/`303649…`); `sshd -T` hash identical (`073d283d…`); Oracle `InstanceServices` chain intact; Docker and containerd enabled and active; proxy (healthy) and certbot containers auto-returned with `0.0.0.0:80`/`443` and `nat DOCKER` DNAT to `172.18.0.2` restored. Externally after reboot: apex HTTPS 503, www 308, HTTP 308, ACME HTTP-01 path 404, TCP 443 reachable, TCP 111/3000/3001/5432 closed, fresh SSH succeeded. Section 6 is closed and Human accepted. A real on-schedule Let's Encrypt renewal and reserved-IPv4 pricing remain operational follow-ups, not claimed as verified.
+
+## Isolated certificate replacement/reload test verified — 2026-09-08 — Ready for review
+
+The reviewed isolated watcher test was executed against a separate `sokoladas-certtest` project with no published host ports, using the production `run-proxy`/`check-certificate`/`nginx.conf` and locally generated self-signed certs A and B. Evidence: initial fingerprint `6411cc95…` equals A's pair and the served cert was A (`E3:80:E3:B1…`); a valid B replacement produced change detection, `nginx -t` success, reload and recorded fingerprint `231eee95…` with served cert B (`E8:5A:FF:65…`); a mismatched B certificate + A key produced `nginx -t` failure (`key values mismatch`, exit 1) with no reload, fingerprint remaining B and served cert remaining B. Cleanup removed the container, network and state directory. Production remained healthy: proxy healthy, renewal loop running, external HTTPS/redirects/ACME correct, fresh SSH, no new public listener. Proves the local replacement/reload path; a real Let's Encrypt renewal and reboot persistence remain unproven. Ready for review, not Human accepted.
+
+## Production renewal loop started and verified — 2026-09-08 — Ready for review
+
+Marijus started the production Certbot renewal-loop service. Evidence: `docker compose ps` shows certbot `Up` and proxy `Up (healthy)`; certbot logs show "certbot renewal loop starting" then "certbot renewal cycle succeeded" (certificate not due, expires 2026-12-07, no renewals attempted). A coordinated `certbot renew --dry-run --non-interactive` reported "all simulated renewals succeeded". The proxy watcher's check-once reported "check-certificate: unchanged" (exit 0) against the served pair. The certbot container exposes but does not publish 80/443; only the proxy publishes `0.0.0.0:80`/`443`.
+
+External checks after the gate: apex HTTPS 503, HTTPS www 308, HTTP apex 308, ACME HTTP-01 path 404, TCP 443 reachable, fresh hostname SSH succeeds. Actual production certificate replacement/reload and reboot persistence remain unverified. Ready for review, not Human accepted.
+
+## HTTPS activation verified — 2026-09-08 — Ready for review
+
+Human-assisted activation. The first attempt failed because `run-proxy` used `#!/bin/bash`, which the `nginx:alpine` image lacks (`exec /usr/local/bin/run-proxy: no such file or directory`, exit 255), causing a restart loop; HTTP was restored via the reviewed rollback, and the wrapper was corrected to POSIX `sh` (with `run-renewal` converted for the same reason). After the fix, the one-shot `nginx -t` passed against the production certificate, and the proxy runs healthy publishing only `0.0.0.0:80:80` and `0.0.0.0:443:443`; host listeners are sshd (22) and docker-proxy (80/443) only.
+
+Marijus added the approved stateful OCI TCP 443 ingress rule from `0.0.0.0/0`, preserving existing rules. External evidence: apex HTTPS returns 503 with the production certificate (subject `CN=sokoladas.eu`, issuer `Let's Encrypt CN=YE2`, 2026-09-08 → 2026-12-07, SANs `sokoladas.eu` and `www.sokoladas.eu`); HTTPS www returns 308 to the apex preserving path/query; HTTP apex/www return 308 to the canonical HTTPS apex; the ACME HTTP-01 path returns 404 (not redirected); TCP 443 is reachable while TCP 111/3000/3001/5432 remain closed; fresh hostname SSH succeeds.
+
+No renewal loop started, no application deployment, and no further OCI/firewall change. Ready for review, not Human accepted.
+
+## Production certificate issuance verified — 2026-09-08 — Ready for review
+
+Marijus executed the approved production-issuance gate with sudo (single attempt). One Let's Encrypt production certificate named `sokoladas.eu` was issued via the containerized Certbot webroot model against the production `sokoladas-staging_letsencrypt` volume and the existing HTTP bootstrap webroot, using an owner-supplied contact email (recorded generically, not verbatim).
+
+Evidence: `certbot certificates` reports `sokoladas.eu` with identifiers `sokoladas.eu www.sokoladas.eu` and expiry 2026-12-07 (`VALID: 89 days`, no staging marker). x509 inspection shows subject `CN=sokoladas.eu`, issuer `CN=YE2,O=Let's Encrypt,C=US`, validity 2026-09-08 → 2026-12-07, and SANs exactly `sokoladas.eu` and `www.sokoladas.eu`. The `live/sokoladas.eu` symlinks (`fullchain.pem`, `privkey.pem`, `cert.pem`, `chain.pem`) are present; the private key was not printed. `docker volume ls` lists `sokoladas-staging_letsencrypt`, `sokoladas-staging_letsencrypt_staging` and `sokoladas-staging_acme_webroot`.
+
+The HTTP bootstrap remained healthy externally (apex/www 503), fresh SSH succeeded, and TCP 443 still timed out. No proxy recreation, TCP 443 publication, OCI 443 ingress, redirect activation or renewal loop. Ready for review, not Human accepted.
+
+## Staging-CA issuance verified — 2026-09-08 — Ready for review
+
+The approved staging-CA gate is executed and verified on human-assisted evidence; the agent performed only local, registry and non-privileged SSH checks. Both pinned images resolve to `linux/arm64` (nginx `1.30.4-alpine` `aed159…`, certbot `certbot/certbot:v5.8.0` `f70ad…`); both Compose manifests parse. The reviewed `https/` artifacts were installed root-owned to `/opt/sokoladas-staging/releases/section6-https-v1` (SHA-256 matched the Mac copies); baseline evidence was captured under `/root/section6-https-v1-evidence` (saved/runtime IPv4/IPv6, INPUT/OUTPUT/InstanceServices, listeners, sshd -T).
+
+Staging issuance used the isolated `sokoladas-staging_letsencrypt_staging` volume and the shared `acme_webroot` webroot against the Let's Encrypt staging directory. Evidence: `certbot certificates` shows `sokoladas.eu` with identifiers `sokoladas.eu www.sokoladas.eu`, expiry 2026-12-07, `INVALID: TEST_CERT`; `renew --dry-run` reported all simulated renewals succeeded; `docker volume ls` lists only `sokoladas-staging_acme_webroot` and `sokoladas-staging_letsencrypt_staging`, so production `sokoladas-staging_letsencrypt` is absent. The running HTTP bootstrap remained healthy externally (apex/www 503), fresh SSH succeeded, and TCP 443 still timed out.
+
+No production certificate, no TCP 443 publication, no OCI 443 ingress, no proxy replacement and no renewal loop. Ready for review, not Human accepted.
+
+## HTTP bootstrap verified — 2026-09-08 — Ready for review
+
+The authorized HTTP-only group is implemented and verified on human-supplied evidence. Marijus performed all privileged deployment and OCI actions; the agent did not use ubuntu or change sudo access. Earlier entries below describe intermediate checkpoints, not the final state.
+
+- External Mac requests at 12:55:53–54 and 13:01:58 UTC returned 200 and exact `sokoladas-section6-http-v1` content for both apex/www ACME token URLs, 503 with the minimal maintenance body for ordinary requests, and 404 for missing tokens. No redirect or authentication challenge appeared. Maintenance responses include no-store, noindex/nofollow and Retry-After 3600.
+- Fresh `ssh -n` through sokoladas.eu returned status 0. TCP 80 connected; TCP 443, 111, 3000, 3001 and 5432 timed out from the Mac. HTTPS timed out with curl status 28. These are source-specific probes paired with on-host inspection, not universal port-isolation proof or evidence of TLS readiness.
+- At 12:54:41 UTC the Docker port-80 DNAT and publication ACCEPT counters were zero. At 13:04:54 UTC both were 13 packets / 832 bytes; FORWARD jumps through empty DOCKER-USER and DOCKER-FORWARD counted 126 packets / 11884 bytes, while the original terminal FORWARD REJECT remained zero. Alongside external HTTP results and the recorded rules, this supports the reviewed DNAT → FORWARD → Docker publication path to 172.18.0.2:80. Host INPUT is not its exposure control; no custom DOCKER-USER policy or manual FORWARD accept was added.
+- Final baseline comparisons passed for `/etc/iptables/rules.v4`, `rules.v6`, runtime INPUT/OUTPUT/InstanceServices and `sshd -T`. Existing iptables-nft/netfilter-persistent policy and SSH/Oracle rules are unchanged. Docker manages the runtime bridge/NAT rules. Reboot behavior was not tested; future published-port and post-reboot verification remains required.
+- Only `sokoladas-staging-proxy-1` was running, healthy with zero failing streak, publishing only `0.0.0.0:80:80`. The only new host listener was docker-proxy IPv4 TCP 80. No TLS, Certbot or application/data service was deployed. The pinned ARM64 image, release directory and bounded local logging are recorded in earlier checkpoints.
+- Human cleanup removed only `/.well-known/acme-challenge/s6-http-v1-check` from the shared webroot and verified its absence. External requests to that former token URL returned 404 for both names at **13:06:18 UTC**. The ACME volume and proxy remain; no test token remains at that path.
+
+The OCI screenshot records TCP 80 permission and preserved SSH/ICMP, with no 443 rule. Its OCID/attachment/egress visibility limits remain as recorded below; no new attachment or egress inspection is inferred. Stable addressing and DNS were not reassessed. No certificate issuance, HTTPS activation, rollback execution or reboot is claimed. Section 6 remains open for separately authorized TLS/renewal work; this result is not yet Human accepted.
+
+## HTTP bootstrap local routing and OCI ingress — human evidence 2026-09-08
+
+Human local tests for apex/www returned the exact documented token body, HTTP 503 for ordinary requests and HTTP 404 for a missing token. The documented test token remains present for external verification; cleanup is pending.
+
+The supplied OCI screenshot of `Default Security List for demo-vnc` shows 1–4 of 4 ingress entries: stateful TCP 22 from 0.0.0.0/0, ICMP type 3/code 4 from 0.0.0.0/0, ICMP type 3 from 10.0.0.0/24, and newly added stateful TCP 80 from 0.0.0.0/0 with source ports All. No TCP 443 ingress is shown. The HTTP description is clipped; the resource OCID, subnet attachment and egress are not visible in this screenshot. Earlier attached-list evidence remains recorded; no fresh attachment/egress claim is inferred from this image. External reachability and actual DNAT/FORWARD counter evidence remain pending.
+
+## HTTP bootstrap proxy and firewall gate — human evidence 2026-09-08
+
+Human startup/inspection evidence shows only `sokoladas-staging-proxy-1` running, healthy with zero failing streak and successful health probes through 12:45:23 UTC. Nginx syntax validation passed. Its only publication is `0.0.0.0:80:80`; edge address is `172.18.0.2/16`, gateway `172.18.0.1`, bridge `br-fe32970b2d53`, with no global IPv6 address. Docker local logging retains 10m × 3, compressed. Host listeners add only docker-proxy on IPv4 TCP 80; no TCP 443 listener/publication is shown.
+
+NAT DOCKER now DNATs TCP 80 to 172.18.0.2:80. Filter DOCKER accepts that destination/port on the edge bridge before its unpublished-traffic DROP. FORWARD retains DOCKER-USER (empty) then DOCKER-FORWARD before the original REJECT; edge bridge dispatch/outbound acceptance and masquerade are Docker-generated changes consistent with the reviewed model. No material structural mismatch is identified. External packet traversal still needs counter/request evidence after OCI ingress; rule presence alone is not public-reachability proof.
+
+Human byte/text comparisons succeeded for saved IPv4/IPv6 files, runtime INPUT/OUTPUT/InstanceServices and effective sshd policy against the captured baseline. The earlier session-function failure did not start a container; subsequent self-contained startup did. No OCI change, test-token creation or external HTTP verification is evidenced yet. Next is documented token creation and local route checks; keep OCI unchanged until their evidence is reviewed.
+
+## HTTP bootstrap image/config validation — human evidence 2026-09-08
+
+Marijus pulled the reviewed Nginx digest and supplied image inspection showing linux/arm64. Nonpublished `compose run --rm` validation reported successful nginx.conf syntax/test, Nginx 1.30.4, aarch64, `/usr/bin/wget` and `/bin/grep`. Both temporary containers were removed; `docker ps -a` was empty afterward.
+
+Compose created `sokoladas-staging_acme_webroot` and `sokoladas-staging_edge`. Network inspection reports bridge, IPv6=false, Internal=false, Options={}. These match the approved bootstrap model. Docker bridge/NAT scaffolding may now exist; no publication or actual packet-flow verification is established by these results. Persistent proxy startup, health/publication checks, token and OCI TCP 80 remain pending.
+
+## HTTP bootstrap file staging — human evidence 2026-09-08
+
+Marijus supplied successful file staging from the Mac (copy commands shown at 15:17 local time) and interactive-sudo preparation on the server. Reviewed bootstrap/scripts were copied to `/opt/sokoladas-staging/releases/section6-http-v1`, owned root:root with group/other writes removed. Recursive comparisons against the uploaded copies returned no differences. Compose `config --quiet` succeeded.
+
+Root-only `/root/section6-http-v1-evidence` now holds runtime IPv4/IPv6 snapshots, original saved policy files, INPUT/OUTPUT/InstanceServices listings, listeners and effective sshd configuration for later comparison. The human's final success message confirms the supplied sequence completed. No image pull, container start, token creation or OCI ingress change is evidenced yet. Next gate is pinned-image and nonpublished Nginx validation; firewall and SSH policy remain outside mutation scope.
+
+## HTTP bootstrap privileged preflight — human evidence 2026-09-08
+
+Marijus supplied interactive-sudo preflight output dated 12:06:32 UTC. Host reports sokoladas-demo/aarch64, iptables 1.8.11 nf_tables and enabled netfilter-persistent. Runtime INPUT retains only established/related, ICMP, loopback and TCP NEW 22 accepts before terminal REJECT. FORWARD policy is DROP, with DOCKER-USER then DOCKER-FORWARD ahead of the original REJECT; DOCKER-USER is empty. NAT has Docker hooks and default-bridge masquerade but no publication DNAT. This matches the reviewed pre-publication model, not proof of the future external HTTP path.
+
+No containers or volumes exist; only default bridge/host/none networks are listed. Host listeners are SSH plus local resolver/time and DHCP services; no TCP 80/443 listener. daemon.json retains default storage and local log bounds. Saved host rules intentionally exclude Docker transient chains; their FORWARD policy differs from runtime because Docker owns the runtime change. InstanceServices remains destination-restricted, including UDP 123 to 169.254.169.254; saved/runtime rendering differs by an explicit `-m udp`, not by destination. No policy correction is required.
+
+The supplied systemctl output has pager-truncated long lines; the earlier agent read captured the complete Docker After line. No reboot/persistence test is inferred. Human confirms Serial Console remains available and will execute privileged/OCI operations; agent ubuntu execution and sudo-policy changes are prohibited. Preflight supports proceeding to staged-file and baseline-evidence preparation, with no proxy startup or OCI ingress change yet verified.
+
+## HTTP bootstrap execution preflight — 2026-09-08 — incomplete
+
+Human authorized the revised TCP-80-only bootstrap. At 12:00:17 UTC, agent SSH as marijus through sokoladas.eu with the existing key, BatchMode and strict host-key checking succeeded; the server reported sokoladas-demo and aarch64. `sudo -n true` failed with `interactive authentication is required`. No privileged checks or configuration changes followed. The readable daemon.json retains default data-root and bounded local logs; netfilter-persistent reports enabled. Readable unit definitions place netfilter-persistent before network-pre and Docker after network-online; no reboot behavior is claimed.
+
+Execution awaits an approved usable sudo path, confirmation that independent Serial Console recovery remains available, and coordination of the OCI Console step. No OCI connector/CLI/local OCI config is available to this agent. No files were copied to the host, no container/image/token was created, no port/rule/service changed, and no external HTTP or forwarding verification is claimed. This is incomplete execution evidence, not successful bootstrap completion.
+
+## Hostname SSH identity — human-verified 2026-09-08 — Ready for review
+
+Marijus reports that this command successfully connected to `sokoladas.eu (79.76.117.246)` using the existing SSH key:
+
+```sh
+ssh -i ~/.ssh/id_ed25519_oracle marijus@sokoladas.eu
+```
+
+The presented ED25519 server host-key fingerprint was:
+
+```text
+SHA256:Qt7o7y7xOUccDssX6R5xGkOfQ0oKGaEYnQlsZ+0usLI
+```
+
+OpenSSH identified it as the same host key already known for both former ephemeral address `152.70.25.153` and reserved address `79.76.117.246`. This is additional human evidence that the canonical hostname resolves to and reaches the intended existing sokoladas-demo server: successful SSH and verified host identity support the conclusion, not DNS alone. The key path identifies the existing client key; no private key material is recorded.
+
+This supplements the earlier address-only SSH and DNS evidence, including the previously unsupplied exact fingerprint. It does not establish HTTP/HTTPS reachability, certificate issuance, application deployment or fresh independent recovery testing. No independent agent SSH/DNS check was performed; Section 6 remains open and the next bootstrap approval scope is unchanged.
+
+## DNS prerequisite — human-verified 2026-09-08 — Ready for review
+
+Marijus manually changed Namecheap records to `A @ 79.76.117.246` and `CNAME www sokoladas.eu`, removing `CNAME www parkingpage.namecheap.com` and `URL Redirect @ http://www.sokoladas.eu/`.
+
+Human-supplied Mac verification:
+
+```text
+$ dig +short sokoladas.eu A
+79.76.117.246
+$ dig +short www.sokoladas.eu A
+sokoladas.eu.
+79.76.117.246
+$ dig +short www.sokoladas.eu AAAA
+sokoladas.eu.
+$ dig +short sokoladas.eu AAAA
+[no output]
+```
+
+The apex resolves to the reserved OCI IPv4, and www aliases to the apex and the same IPv4. The AAAA answers contain no IPv6 address for either hostname; the www response is the CNAME, not an IPv6 address. DNS is ready for the planned IPv4-only HTTP/HTTPS bootstrap on this human evidence. The accidental `dig ... AAA` command is excluded from verification evidence.
+
+DNS prerequisite is complete. These are results from the human's Mac resolver at the time of testing, not independent agent queries or proof of every worldwide cache. TTL, authoritative-server/CAA/DNSSEC checks and exact timestamps were not supplied; none are invented. This evidence does not establish HTTP reachability, firewall changes, certificate issuance or Nginx deployment. Earlier no-DNS-change statements describe the preceding address-cutover step. Section 6 remains open; sokoladas.online stays outside scope.
+
+## Reserved public IPv4 — human-executed 2026-09-08 — Ready for review
+
+Marijus reports successful creation of OCI Reserved Public IPv4 resource **`sokoladas-public-ip`**, address **`79.76.117.246`**, replacing the former ephemeral **`152.70.25.153`** on sokoladas-demo. The new reserved public address is assigned to primary private IPv4 **`10.0.0.52`**; OCI IP Administration displays `79.76.117.246 (Reserved)` on that private IP. Guest private IPv4 remains `10.0.0.52`.
+
+SSH to `marijus@79.76.117.246` succeeded using the existing key. SSH identified the same ED25519 server host key previously known for `152.70.25.153`, supporting continuity of server identity across the address change. The exact fingerprint and execution time were not supplied; this is human evidence, not an independent agent test.
+
+**UI inconsistency:** the same OCI IP Administration row displays `IP lifetime: Ephemeral` alongside public address `79.76.117.246 (Reserved)`. Record both labels without reclassifying the public address: the human-created reserved resource and explicit `(Reserved)` public-address label establish the reported reserved assignment. The scope/cause of the lifetime field has not been verified; no corrective live action is inferred.
+
+Marijus reports no DNS, firewall, Nginx, Docker or application changes in this step. Stable-address creation/assignment and new-address SSH verification are complete on this evidence. Section 6 DNS/HTTPS work remains unfinished. No new pricing evidence, OCIDs, outbound-connectivity test, fresh sudo/ubuntu/Serial Console test or broader port scan was supplied; do not infer these from successful SSH. Recorded historical recovery evidence remains unchanged. Do not use the released ephemeral address for future access or DNS rollback.
+
+This record supersedes earlier current-address/ephemeral descriptions; dated historical observations below retain their original addresses. See the [Section 6 plan and remaining work](domain-https-plan.md). This documentation reconciliation performed no live access/change, commit or push.
+
 ## Docker host installed and verified — 2026-09-08 — Human accepted
 
 The owner approved the Section 4 rootful Docker target and live installation. Implemented on `sokoladas-demo` (`152.70.25.153`) with preflight at **10:01:35 UTC**, repository setup at **10:02:10–10:02:15 UTC**, package installation at **10:02:39–10:02:56 UTC**, and verification through **10:04:34 UTC**. Administrative commands ran through ubuntu SSH with sudo; no credentials, sudoers, group memberships or SSH configuration were changed. This result supersedes the earlier assessment's absent-runtime state and pending target choices. Marijus explicitly accepted the Section 4 Docker host implementation and its documentation on 2026-09-08. It is Human accepted.

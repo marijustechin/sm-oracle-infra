@@ -1,0 +1,33 @@
+# Review candidate only; deployment requires explicit human approval.
+name: sokoladas-staging
+services:
+  proxy:
+    image: nginx:1.30.4-alpine@sha256:aed159a7f218b47bbdc020b9c74dfcfb6825a67b00d3b2c14c34cd38025fe098
+    platform: linux/arm64
+    entrypoint: [nginx]
+    command: ['-g', 'daemon off;']
+    restart: unless-stopped
+    ports:
+      - '0.0.0.0:80:80'
+    networks: [edge]
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - acme_webroot:/var/www/acme:ro
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:8080/health/ready | grep -qx ok']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+networks:
+  edge:
+    driver: bridge
+    enable_ipv6: false
+volumes:
+  acme_webroot:
+    name: sokoladas-staging_acme_webroot

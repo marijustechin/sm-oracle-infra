@@ -1,0 +1,42 @@
+# Section 6 isolated certificate replacement/reload test — review candidate only.
+#
+# Exercises the same reviewed run-proxy, check-certificate and nginx.conf against
+# locally generated self-signed certificates. No host ports are published, no
+# production letsencrypt volume and no renewal loop are involved. It is a test
+# harness, not a service: start it only under the human-assisted test gate and
+# tear it down afterward (see docs/https-runbook.md "Isolated certificate
+# replacement/reload test").
+name: sokoladas-certtest
+services:
+  proxy:
+    image: nginx:1.30.4-alpine@sha256:aed159a7f218b47bbdc020b9c74dfcfb6825a67b00d3b2c14c34cd38025fe098
+    platform: linux/arm64
+    entrypoint: ['/usr/local/bin/run-proxy']
+    restart: "no"
+    # No `ports:` — reachable only via its bridge IP from the host, never public.
+    networks: [edge]
+    volumes:
+      - type: bind
+        source: ./proxy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/run-proxy
+        target: /usr/local/bin/run-proxy
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/check-certificate
+        target: /usr/local/bin/check-certificate
+        read_only: true
+        bind:
+          create_host_path: false
+      - /root/section6-certtest-state/letsencrypt:/etc/letsencrypt:ro
+      - /root/section6-certtest-state/webroot:/var/www/acme:ro
+networks:
+  edge:
+    driver: bridge
+    enable_ipv6: false

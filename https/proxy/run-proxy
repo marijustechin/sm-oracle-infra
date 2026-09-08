@@ -1,0 +1,59 @@
+#!/bin/sh
+# run-proxy — start Nginx, then run a one-shot hourly certificate-change check.
+#
+# A single script with Nginx as its only child process. Before starting Nginx,
+# `nginx -t` validates the complete runtime configuration and certificate state
+# and the container fails immediately if it is invalid. The checker is an inline
+# loop that invokes check-certificate once per interval: certificate-check
+# failures are logged and retried at the next interval, never fatal. Only
+# unexpected Nginx termination ends the loop and exits the container so Docker
+# applies its restart policy. Certbot has no Docker socket mount and no Nginx
+# control channel; certificate changes are detected by content fingerprint and
+# applied with `nginx -t` + `nginx -s reload`.
+set -eu
+
+: "${FULLCHAIN:=/etc/letsencrypt/live/sokoladas.eu/fullchain.pem}"
+: "${PRIVKEY:=/etc/letsencrypt/live/sokoladas.eu/privkey.pem}"
+: "${STATE_FILE:=/run/nginx-cert.fp}"
+: "${CHECK_SCRIPT:=/usr/local/bin/check-certificate}"
+: "${CHECK_INTERVAL:=3600}"
+
+# Fail before starting Nginx if the complete configuration/certificate state is
+# invalid; this is a startup guard distinct from the certificate-triggered
+# `nginx -t` inside check-certificate.
+if ! nginx -t; then
+    echo "run-proxy: nginx -t failed; refusing to start" >&2
+    exit 1
+fi
+
+nginx -g 'daemon off;' &
+nginx_pid=$!
+
+# Sample the pair Nginx just loaded at startup so the first hourly check does
+# not treat it as a change.
+if [ -f "$FULLCHAIN" ] && [ -f "$PRIVKEY" ]; then
+    cat "$FULLCHAIN" "$PRIVKEY" | sha256sum | awk '{print $1}' > "$STATE_FILE"
+fi
+
+cleanup() {
+    trap - TERM INT QUIT HUP
+    if kill -0 "$nginx_pid" 2>/dev/null; then
+        nginx -s quit 2>/dev/null || true
+    fi
+    wait "$nginx_pid" 2>/dev/null || true
+    exit 0
+}
+trap cleanup TERM INT QUIT HUP
+
+while kill -0 "$nginx_pid" 2>/dev/null; do
+    # One-shot check; a failed check is logged and retried next interval.
+    "$CHECK_SCRIPT" || true
+    remaining="$CHECK_INTERVAL"
+    while [ "$remaining" -gt 0 ] && kill -0 "$nginx_pid" 2>/dev/null; do
+        sleep 5
+        remaining=$((remaining - 5))
+    done
+done
+
+echo "run-proxy: nginx exited; stopping container" >&2
+exit 1
