@@ -8,18 +8,16 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
-The [application deployment contract](docs/application-deployment-contract.md) defines the interface to the application repository, the recommended image delivery model (GHCR + GitHub Actions buildx, ARM64-only, digest-pinned), and the blockers that must be resolved first. The items below remain unfinished until the application supplies the §5 answers.
+The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is prepared for review in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md): Compose model, digest-pin mechanism (`images.env`), deploy/rollback script, secret-delivery model, PostgreSQL runtime, and proxy app routing. Real GHCR image digests and production secrets do not exist yet.
 
-- [ ] Implement the accepted prebuilt ARM64 image delivery model; select registry/build environment and verify image access/pins
-- [ ] Obtain application image contracts: ports, /api ownership, health/migration commands, UIDs, write paths and file-secret support
-- [ ] Verify PG18 compatibility with selected ORM/extensions before initialization
-- [ ] Implement Compose services, accepted edge/app/db networks, persistent volumes, initialization and health checks
-- [ ] Provision per-service secrets, confirm recovery custody and verify access/rotation
-- [ ] Implement and verify invited staging access and disabled uploads/email/payments; separately approve any integration and required egress
+- [ ] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests and confirm exact environment/file-secret names, writable paths and DB connection layout (contract C.1)
+- [ ] Set up GHCR registry/build access and verify `linux/arm64` pull with the real digests
+- [ ] Verify Prisma/ORM compatibility with PostgreSQL 18 before initialization
+- [ ] Provision real production secrets (root-managed files) and confirm recovery custody/rotation
 - [ ] Create deployment user/process if needed
-- [ ] Add deploy script
-- [ ] Add rollback procedure
-- [ ] Verify clean deploy from scratch
+- [ ] Implement and verify invited staging access and disabled uploads/email/payments; separately approve any integration and required egress
+- [ ] Execute deployment (`deploy/deploy.sh deploy`) and verify frontend/API health through Nginx end-to-end
+- [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
 
 ## 8. Backups
 

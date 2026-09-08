@@ -1,5 +1,17 @@
 # Infrastructure Change Log
 
+## 2026-09-09
+
+### Section 7 deployment foundation prepared — Ready for review
+
+Resumed Section 7 using the application repository's Human-accepted initial scaffold, whose runtime facts are now confirmed: `linux/arm64`, frontend port 3000, API port 3001, `/api/*` owned by the API, `GET /health/ready` readiness for both services, runtime UID:GID 10001:10001, stateless/disposable frontend and API, foreground processes with graceful SIGTERM and no in-container supervisor, migrations reusing the API image via `prisma migrate deploy`, and PostgreSQL 18.
+
+Reconciled [docs/application-deployment-contract.md](docs/application-deployment-contract.md): added a "Confirmed application runtime facts" table, marked the B defaults confirmed versus infra-owned, and split C into "awaiting application implementation" (real image digests, env/secret names, writable paths, API readiness semantics) and "product-dependent, unresolved" (egress, uploads, additional secrets). Historical accepted decisions were not rewritten.
+
+Prepared the infra-side foundation in [`deploy/`](deploy/): a full-stack Compose model (`compose.yaml`) with proxy/frontend/api/db/migrate/certbot on the accepted edge/app/db networks, `pg_data` volume, no public frontend/API/PostgreSQL ports, `WEB_IMAGE`/`API_IMAGE` supplied via `images.env` (with `deploy.sh` refusing non-digest references), file-based secret mounts, infra-owned health checks and dependency ordering, and a first-boot PostgreSQL role-creation script; an app-routing Nginx config (`deploy/proxy/nginx.conf`) that forwards `/api` to the API and everything else to the frontend; and a `deploy/deploy.sh` with preflight/validate/migrate/deploy/health/rollback, where rollback re-selects previous digests and explicitly does not revert database migrations. Added [docs/deployment.md](docs/deployment.md) recording the secret-delivery structure/permissions, GHCR read-only authentication (no credentials), the PostgreSQL persistence model, migration ordering and rollback limitations, and the verification boundaries. Updated TODO (Section 7) and README (file table).
+
+Verification was repository-local only: Compose parsing, Bash/sh syntax, and whitespace/secret scans. No application images, no production secrets, no live server change, no commit or push. The following remain unverifiable until the application supplies digests/schema: real ARM64 image pull, real application startup, migration execution, frontend/API health through Nginx, a clean deploy, and final public-port isolation.
+
 ## 2026-09-08
 
 ### Section 7 application deployment contract and image delivery prepared — Ready for review

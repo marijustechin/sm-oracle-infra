@@ -1,0 +1,48 @@
+#!/bin/sh
+# check-certificate — one-shot certificate change detection, validation, reload.
+#
+# Compares the configured fullchain/privkey pair against the last-known
+# fingerprint. On a stable, validated change it runs `nginx -t` then
+# `nginx -s reload` and records the new fingerprint. Missing or invalid input
+# never triggers a reload, and a pair that changes during reload is not recorded.
+#
+# Paths and the Nginx binary are overridable via environment for isolated tests.
+set -eu
+
+: "${FULLCHAIN:=/etc/letsencrypt/live/sokoladas.eu/fullchain.pem}"
+: "${PRIVKEY:=/etc/letsencrypt/live/sokoladas.eu/privkey.pem}"
+: "${STATE_FILE:=/run/nginx-cert.fp}"
+: "${NGINX_BIN:=nginx}"
+
+fingerprint() {
+    cat "$FULLCHAIN" "$PRIVKEY" | sha256sum | awk '{print $1}'
+}
+
+if [ ! -f "$FULLCHAIN" ] || [ ! -f "$PRIVKEY" ]; then
+    echo "check-certificate: certificate files missing; no reload" >&2
+    exit 1
+fi
+
+current="$(fingerprint)"
+
+if [ -f "$STATE_FILE" ] && [ "$(cat "$STATE_FILE")" = "$current" ]; then
+    echo "check-certificate: unchanged" >&2
+    exit 0
+fi
+
+echo "check-certificate: change detected; validating configuration" >&2
+if ! "$NGINX_BIN" -t; then
+    echo "check-certificate: nginx -t failed; keeping previous fingerprint" >&2
+    exit 1
+fi
+"$NGINX_BIN" -s reload
+
+after="$(fingerprint)"
+if [ "$current" != "$after" ]; then
+    echo "check-certificate: files changed during reload; not recording" >&2
+    exit 1
+fi
+
+printf '%s\n' "$current" > "$STATE_FILE"
+echo "check-certificate: reloaded; recorded new fingerprint" >&2
+exit 0

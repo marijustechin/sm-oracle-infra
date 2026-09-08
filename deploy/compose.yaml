@@ -1,0 +1,198 @@
+# Section 7 production/staging deployment model — review candidate only.
+#
+# Consistent with the Human-accepted Section 5 architecture and the reconciled
+# Section 7 contract. Image references for the application are supplied
+# externally via images.env (WEB_IMAGE / API_IMAGE) and MUST be immutable
+# `@sha256:` digests; deploy.sh refuses mutable tags. PostgreSQL uses the
+# `postgres:18` tag as a placeholder — pin its digest only after Prisma/ORM
+# compatibility is verified (TODO §7). Nothing here is deployed until the real
+# digests and secrets exist.
+name: sokoladas-staging
+
+services:
+  proxy:
+    image: nginx:1.30.4-alpine@sha256:aed159a7f218b47bbdc020b9c74dfcfb6825a67b00d3b2c14c34cd38025fe098
+    platform: linux/arm64
+    entrypoint: ['/usr/local/bin/run-proxy']
+    restart: unless-stopped
+    ports:
+      - '0.0.0.0:80:80'
+      - '0.0.0.0:443:443'
+    networks: [edge, app]
+    volumes:
+      - type: bind
+        source: ./proxy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/run-proxy
+        target: /usr/local/bin/run-proxy
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./proxy/check-certificate
+        target: /usr/local/bin/check-certificate
+        read_only: true
+        bind:
+          create_host_path: false
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme_webroot:/var/www/acme:ro
+    secrets:
+      - staging_access
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:8080/health/ready | grep -qx ok']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    image: ${WEB_IMAGE}
+    platform: linux/arm64
+    user: '10001:10001'
+    init: true
+    restart: unless-stopped
+    networks: [app]
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+      # Remaining nonsecret settings (NODE_ENV, public origin, feature flags)
+      # come from the host staging.env at deployment; exact names are an open
+      # contract field (C.1.2).
+    healthcheck:
+      # Probe tooling must be confirmed against the actual image.
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:3000/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  api:
+    image: ${API_IMAGE}
+    platform: linux/arm64
+    user: '10001:10001'
+    init: true
+    restart: unless-stopped
+    networks: [app, db]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: '3001'
+      # DB host/name/user and origin come from staging.env; the password is
+      # read from the db_app_password secret file and assembled in-process.
+    secrets:
+      - db_app_password
+      - session_signing_key
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:3001/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+
+  db:
+    image: postgres:18  # pin digest after ORM/extension compatibility is verified
+    platform: linux/arm64
+    restart: unless-stopped
+    networks: [db]
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+      POSTGRES_DB: sokoladas_staging  # accepted target name; confirm with app
+    secrets:
+      - db_admin_password
+      - db_init_app_password
+      - db_init_migration_password
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - type: bind
+        source: ./db/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U postgres -d sokoladas_staging']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  migrate:
+    image: ${API_IMAGE}
+    platform: linux/arm64
+    user: '10001:10001'
+    restart: 'no'
+    profiles: [tools]
+    networks: [db]
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ['prisma', 'migrate', 'deploy']
+    # The DATABASE_URL (or equivalent) must be assembled in-process from the
+    # nonsecret DB host/name/user and the db_migration_password file. Exact
+    # mechanism is app-owned (C.1.3).
+    secrets:
+      - db_migration_password
+
+  certbot:
+    image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
+    platform: linux/arm64
+    entrypoint: ['/opt/certbot/run-renewal']
+    restart: unless-stopped
+    networks: [edge]
+    volumes:
+      - type: bind
+        source: ./certbot/run-renewal
+        target: /opt/certbot/run-renewal
+        read_only: true
+        bind:
+          create_host_path: false
+      - letsencrypt:/etc/letsencrypt
+      - acme_webroot:/var/www/acme
+    tmpfs:
+      - /var/lib/letsencrypt:rw,size=64m,noexec
+      - /var/log/letsencrypt:rw,size=64m,noexec
+
+networks:
+  edge:
+    driver: bridge
+    enable_ipv6: false
+  app:
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+  db:
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+
+volumes:
+  pg_data:
+    name: sokoladas-staging_pg_data
+  letsencrypt:
+    name: sokoladas-staging_letsencrypt
+  acme_webroot:
+    name: sokoladas-staging_acme_webroot
+
+secrets:
+  # File-backed Compose secrets retain bind-mount ownership, so the host-side
+  # secret files under /etc/sokoladas-staging/secrets/ must be created with the
+  # ownership described in docs/deployment.md (app UID 10001, postgres UID, or
+  # Nginx worker UID) rather than relying on uid/gid/mode overrides here.
+  db_admin_password:
+    file: /etc/sokoladas-staging/secrets/db_admin_password
+  db_app_password:
+    file: /etc/sokoladas-staging/secrets/db_app_password
+  db_migration_password:
+    file: /etc/sokoladas-staging/secrets/db_migration_password
+  db_init_app_password:
+    file: /etc/sokoladas-staging/secrets/db_init_app_password
+  db_init_migration_password:
+    file: /etc/sokoladas-staging/secrets/db_init_migration_password
+  session_signing_key:
+    file: /etc/sokoladas-staging/secrets/session_signing_key
+  staging_access:
+    file: /etc/sokoladas-staging/secrets/staging_access

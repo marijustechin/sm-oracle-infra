@@ -1,0 +1,18 @@
+#!/bin/sh
+# run-renewal — Certbot renewal loop.
+#
+# Runs `certbot renew --non-interactive` on startup, then every 12 hours with
+# modest jitter. Failures are logged and retried next cycle; the loop does not
+# exit on a failed renewal. No Docker socket or Nginx control channel is present.
+set -eu
+
+echo "certbot renewal loop starting" >&2
+while true; do
+    if certbot renew --non-interactive; then
+        echo "certbot renewal cycle succeeded" >&2
+    else
+        echo "certbot renewal cycle failed; will retry next cycle" >&2
+    fi
+    # 12 hours plus up to ~10 minutes of jitter to spread CA load.
+    sleep "$(( 43200 + ($(date +%s) % 600) ))"
+done
