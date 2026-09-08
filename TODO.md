@@ -8,11 +8,9 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 The six-file documentation baseline and basic secret-handling rules are Human accepted. Section 5 architecture is [Human accepted](docs/application-architecture.md) and closed; operational implementation and secret delivery remain open below. The [recorded inventory](docs/server.md) distinguishes historical reports from unverified current state.
 
-## 4. Docker host
+## 4. Docker host — Human accepted (closed)
 
-Docker Engine, Compose and Buildx are installed and verified [Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted). The approved sudo administration model, default storage locations, bounded local logging and restart guidance are recorded. The Docker installation test was cleaned up; Section 6 now runs the Nginx HTTP bootstrap. Installation is complete; future deployment exposure verification remains:
-
-- [ ] Verify container forwarding/NAT and Docker-published ports with OCI rules for the actual deployment; keep direct application/database ports private. Recheck after any authorized firewall reload/reboot before claiming persistence.
+Docker Engine 29.8.0, Compose 5.5.1 and Buildx 0.37.0 are installed and verified on ARM64 with the approved sudo administration, default storage, bounded local logging and restart guidance ([Human accepted](docs/server.md#docker-host-installed-and-verified--2026-09-08--human-accepted)). The deferred deployment verification is now complete via Section 6 evidence: Docker port publication on TCP 80/443 was exercised and externally verified, the DNAT/FORWARD path was inspected, a controlled reboot confirmed Docker/containerd enabled+active with `restart: unless-stopped` containers auto-returning and 80/443 publications restored, saved firewall/`sshd`/`InstanceServices` remained unchanged, and no unintended public Docker ports appeared. The only remaining exposure check is the future application deployment (frontend/API/PostgreSQL port privacy), which belongs to Section 7.
 
 ## 6. Domain and HTTPS — Human accepted (closed)
 
