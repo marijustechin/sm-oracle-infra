@@ -8,11 +8,12 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
-The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is prepared for review in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md): Compose model, digest-pin mechanism (`images.env`), deploy/rollback script, secret-delivery model, PostgreSQL runtime, and proxy app routing. Real GHCR image digests and production secrets do not exist yet.
+The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is prepared for review in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md): Compose model, digest-pin mechanism (`images.env`), deploy/rollback script, secret-delivery model, PostgreSQL runtime, and proxy app routing. Real application GHCR digests now exist (recorded in the contract); production secrets do not exist yet.
 
-- [ ] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests and confirm exact environment/file-secret names, writable paths and DB connection layout (contract C.1)
+- [x] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests (contract C.1) and reconcile the exact environment/file-secret names, writable paths and DB connection layout — done 2026-09-15; digests recorded in the contract ("Published application images")
+- [ ] Update `deploy/compose.yaml` to the reconciled interface: grant `jwt_access_secret` (replacing `session_signing_key`) as `JWT_ACCESS_SECRET_FILE`, and provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate`
 - [ ] Set up GHCR registry/build access and verify `linux/arm64` pull with the real digests
-- [ ] Verify Prisma/ORM compatibility with PostgreSQL 18 before initialization
+- [ ] Verify Prisma/ORM compatibility with PostgreSQL 18 before initialization (application-side migration and readiness passed on 2026-09-15 against a disposable PostgreSQL 18; reconfirm during first real initialization)
 - [ ] Provision real production secrets (root-managed files) and confirm recovery custody/rotation
 - [ ] Create deployment user/process if needed
 - [ ] Implement and verify invited staging access and disabled uploads/email/payments; separately approve any integration and required egress

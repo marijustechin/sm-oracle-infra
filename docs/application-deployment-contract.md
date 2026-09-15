@@ -18,8 +18,80 @@ The separate application repository has completed and accepted its initial scaff
 | Process model | foreground processes; graceful `SIGTERM`; no in-container supervisor |
 | Migrations | reuse the API image and execute `prisma migrate deploy` |
 | Database | PostgreSQL 18 |
+| Healthcheck tooling | `wget`, `grep`, `cat`, `awk`, `sha256sum` are present in both runtime images (alpine/busybox); the Compose health commands work as written |
+| Runtime user | both images run as UID:GID `10001:10001`; verified |
+| Migration runtime | the API image contains the Prisma CLI and the built `@smshop/db` package; its default working directory is `/app/packages/db`, so `prisma migrate deploy` resolves `prisma7.config.ts` and the schema; verified exit 0 against PostgreSQL 18 as UID 10001 |
+| Database connection | a full `DATABASE_URL` (or `DATABASE_URL_FILE`) wins; otherwise the application assembles the URL from `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` and `DB_PASSWORD` (or `DB_PASSWORD_FILE`). The API and the Prisma CLI use the same resolution |
+| Access-token secret | application secret is `JWT_ACCESS_SECRET` (supports `JWT_ACCESS_SECRET_FILE`); there is no `session_signing_key` variable in the application |
 
-Real production GHCR image references/digests are **not** available yet and must not be invented; deployment cannot proceed against placeholder images.
+Real production GHCR image references/digests now exist (first publication 2026-09-15; see "Published application images" below). On 2026-09-15 the application repository built and ran both images locally for `linux/arm64`, then published them via GitHub Actions to GHCR; the published digests were pulled back and re-verified.
+
+### Published application images — 2026-09-15
+
+First immutable application images published by the application repository's
+`Images` workflow (GitHub Actions run `35013479067`, source commit
+`d515dff20390b76cb4b82e68838d78e38d318f2e`). Deployment must reference these by
+digest; `deploy/images.env` supplies them at deploy time (the file stays outside
+Git).
+
+| Image | Reference (immutable) | Platform |
+|---|---|---|
+| Web (`WEB_IMAGE`) | `ghcr.io/marijustechin/smshop-web@sha256:ca5855625acd8ef51f41e9b688511ab7f9ffa55f892c232c370ab30b8a728220` | `linux/arm64` |
+| API (`API_IMAGE`) | `ghcr.io/marijustechin/smshop-api@sha256:eab3ee009a5c086bfd94df9230f34133ec7111a9f1f122a1649b20c43368c7ed` | `linux/arm64` |
+
+Source SHA tag (traceability, not the deploy reference):
+`sha-d515dff20390b76cb4b82e68838d78e38d318f2e`.
+
+Verification performed 2026-09-15 against these exact digests: both are
+`linux/arm64` (no `amd64` entry); pulled from GHCR and run under emulation; web
+and API `/health/ready` returned `200`; `prisma migrate deploy` from the
+published API image exited `0` against PostgreSQL 18; registration returned
+`201`. The digests are the deployment pin; the SHA tag is traceability only.
+
+### Reconciled application runtime interface — 2026-09-15
+
+Application-owned names/semantics (authoritative detail in
+`smshop/docs/configuration.md` and `smshop/docs/deployment.md`). This section
+records the interface only; it does not invent secret values.
+
+**Runtime (nonsecret) environment**
+
+| Variable | Service | Notes |
+|---|---|---|
+| `NODE_ENV=production` | api | required for `Secure` refresh cookies |
+| `PORT` | api | `3001` |
+| `WEB_ORIGIN` | api | `https://sokoladas.eu` (CORS + email links) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` | api, migrate | nonsecret DB components; port defaults `5432` |
+| `JWT_ACCESS_TTL`, `AUTH_SESSION_TTL` | api | optional; defaults `15m`/`7d` |
+| SMTP/Google/Turnstile blocks | api | optional; all-or-none groups, disabled when absent |
+
+**File-backed secrets** (`<NAME>_FILE`, raw value; one trailing newline tolerated)
+
+| Variable | Consumer | Purpose |
+|---|---|---|
+| `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`) | api | application DB login |
+| `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`) | migrate | migration DB login (separate role) |
+| `JWT_ACCESS_SECRET_FILE` | api | signs access JWTs and derives the OAuth transaction key |
+| `SMTP_PASSWORD_FILE` | api | optional (mail disabled initially) |
+| `GOOGLE_CLIENT_SECRET_FILE` | api | optional |
+| `TURNSTILE_SECRET_KEY_FILE` | api | optional |
+
+**Frontend (build-time, public, inlined by Next.js)**
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | unset in production; relative `/api` is used (same origin) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | required at image build time only when Turnstile is enabled |
+
+**Migration job** (`migrate`, reusing `API_IMAGE`): command
+`prisma migrate deploy`, default working directory `/app/packages/db`, runs as
+UID 10001, exit 0 required.
+
+Infrastructure-side changes implied by this reconciliation (implementation
+follow-ups recorded in `TODO.md` §7): replace the `session_signing_key` secret
+with `jwt_access_secret`; supply the DB component variables and
+`DB_PASSWORD_FILE` (or a `DATABASE_URL` file) to `api` and `migrate` instead of
+assembling the URL inside Compose; keep the existing `db_*` init secrets.
 
 ## Ownership and boundary
 
@@ -79,17 +151,31 @@ These values are supplied by the application project and are not invented by inf
 
 ### C.1 Awaiting application implementation
 
-1. Real `WEB_IMAGE` and `API_IMAGE` GHCR references pinned by immutable digest (`…@sha256:…`).
-2. Exact nonsecret environment variable names and the database connection layout (host/user/name, and how the password file is consumed).
-3. Exact file-based secret names and confirmation of `*_FILE`-style reading support.
-4. Exact writable runtime paths (frontend cache/tmp; API tmp), given the confirmed stateless default.
-5. Exact API readiness semantics (the authenticated DB query and expected schema).
+1. Real `WEB_IMAGE` and `API_IMAGE` GHCR references pinned by immutable digest
+   (`…@sha256:…`) — **resolved 2026-09-15**. `ghcr.io/marijustechin/smshop-web`
+   and `ghcr.io/marijustechin/smshop-api` are published and pinned by digest
+   (see "Published application images" above); both verified `linux/arm64`.
+2. Exact nonsecret environment variable names and the database connection
+   layout — **resolved**. A full `DATABASE_URL`/`DATABASE_URL_FILE` wins;
+   otherwise the application assembles the URL from `DB_HOST`/`DB_PORT`/
+   `DB_NAME`/`DB_USER` plus `DB_PASSWORD`/`DB_PASSWORD_FILE`.
+3. Exact file-based secret names and `*_FILE` reading support — **resolved**
+   application-side: `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`),
+   `JWT_ACCESS_SECRET_FILE`, `SMTP_PASSWORD_FILE`,
+   `GOOGLE_CLIENT_SECRET_FILE`, `TURNSTILE_SECRET_KEY_FILE`. Production secret
+   file names/mounts remain infrastructure-owned.
+4. Exact writable runtime paths — **resolved**: ephemeral `/tmp`; the images are
+   otherwise stateless (verified runs performed no other filesystem writes).
+5. Exact API readiness semantics — **resolved**: `GET /health/ready` performs an
+   authenticated `SELECT 1` through the application Prisma client and returns
+   `200 {status:'ok'}` or `503` when the database is unavailable. It does not
+   verify full schema completeness.
 
 ### C.2 Product-dependent, still unresolved
 
 6. Egress requirements — whether any server-side outbound Internet is needed (none initially).
 7. Persistent storage beyond PostgreSQL (e.g. uploads) — none required now; revisit only if uploads are approved.
-8. Additional secrets (e.g. session-signing key, sandbox provider keys) and their exact names.
+8. Additional secrets beyond `JWT_ACCESS_SECRET` / DB credentials (e.g. sandbox payment or email provider keys) and their exact names.
 
 ## Image delivery model (recommended initial)
 
@@ -108,11 +194,13 @@ The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](
 |---|---|---|---|---|---|
 | `proxy` | Nginx (pinned) | `edge`, `app` | `0.0.0.0:80`/`443` | release `nginx.conf`/`conf.d`; `letsencrypt` ro; `acme_webroot` ro; `staging_access` secret | `unless-stopped`; starts independent of upstreams |
 | `frontend` | `${WEB_IMAGE}` | `app` | none | no secrets; ephemeral `/tmp` | `unless-stopped`, `init: true`, UID 10001 |
-| `api` | `${API_IMAGE}` | `app`, `db` | none | `db_app_password`, `session_signing_key` | `unless-stopped`, `init: true`, UID 10001; `depends_on: db (service_healthy)` |
+| `api` | `${API_IMAGE}` | `app`, `db` | none | `db_app_password` (as `DB_PASSWORD_FILE`), `jwt_access_secret` (as `JWT_ACCESS_SECRET_FILE`) | `unless-stopped`, `init: true`, UID 10001; `depends_on: db (service_healthy)` |
 | `db` | PostgreSQL 18 (digest to be pinned) | `db` | none | `pg_data` → `/var/lib/postgresql`; init role files | `unless-stopped`; `pg_isready` |
-| `migrate` | `${API_IMAGE}` | `db` | none | `db_migration_password` | `restart: "no"`, profile `tools`; `prisma migrate deploy` exit 0 gate |
+| `migrate` | `${API_IMAGE}` | `db` | none | `db_migration_password` (as `DB_PASSWORD_FILE`) | `restart: "no"`, profile `tools`; `prisma migrate deploy` exit 0 gate |
 | `certbot` | certbot (pinned) | `edge` | none | `letsencrypt` rw, `acme_webroot` rw, bounded tmpfs | `unless-stopped` loop |
 
 - **Nginx routing:** `/` and assets → `frontend:3000`; `/api` and `/api/` → `api:3001` (prefix preserved). Ports are confirmed.
 - **Release ordering:** DB healthy → run the migration job to exit 0 → start API/frontend → verify the full request path through the proxy.
 - All services inherit the accepted Docker `local` log policy (10m × 3, compressed). No `container_name`, host network, privileged mode, Docker socket, or host PID namespace.
+
+**Pending infrastructure implementation (recorded in `TODO.md` §7, not changed here):** the current `deploy/compose.yaml` still grants `session_signing_key` to `api` and does not set the database component variables. It must be updated to grant `jwt_access_secret` (as `JWT_ACCESS_SECRET_FILE`) and to provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate`. No Compose file was modified by the 2026-09-15 application reconciliation.
