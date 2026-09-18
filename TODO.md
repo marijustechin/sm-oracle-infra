@@ -8,17 +8,20 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
-The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is prepared for review in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md): Compose model, digest-pin mechanism (`images.env`), deploy/rollback script, secret-delivery model, PostgreSQL runtime, and proxy app routing. Real application GHCR digests now exist (recorded in the contract); production secrets do not exist yet.
+The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md). The application is **deployed and verified** (D-002, 2026-09-15) — see [docs/server.md](docs/server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review).
 
 - [x] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests (contract C.1) and reconcile the exact environment/file-secret names, writable paths and DB connection layout — done 2026-09-15; digests recorded in the contract ("Published application images")
-- [ ] Update `deploy/compose.yaml` to the reconciled interface: grant `jwt_access_secret` (replacing `session_signing_key`) as `JWT_ACCESS_SECRET_FILE`, and provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate`
-- [ ] Set up GHCR registry/build access and verify `linux/arm64` pull with the real digests
-- [ ] Verify Prisma/ORM compatibility with PostgreSQL 18 before initialization (application-side migration and readiness passed on 2026-09-15 against a disposable PostgreSQL 18; reconfirm during first real initialization)
-- [ ] Provision real production secrets (root-managed files) and confirm recovery custody/rotation
-- [ ] Create deployment user/process if needed
-- [ ] Implement and verify invited staging access and disabled uploads/email/payments; separately approve any integration and required egress
-- [ ] Execute deployment (`deploy/deploy.sh deploy`) and verify frontend/API health through Nginx end-to-end
+- [x] Update `deploy/compose.yaml` to the reconciled interface: grant `jwt_access_secret` (replacing `session_signing_key`) as `JWT_ACCESS_SECRET_FILE`, and provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate` — done 2026-09-15; `postgres:18` pinned by digest; db init grants fixed and validated locally
+- [x] Host-side image pull and `linux/arm64` verification with the real digests (packages are public; no server registry credential required) — done 2026-09-15
+- [x] Verify Prisma/ORM compatibility with PostgreSQL 18 — verified live 2026-09-15 (migration exit 0, idempotent)
+- [x] Provision the staging secrets (root-managed files under `/etc/sokoladas-staging/secrets/`) — done 2026-09-15 (values not recorded; ownership/mode verified). Recovery custody/rotation confirmation remains open
+- [x] Execute deployment (`deploy/deploy.sh deploy`) and verify frontend/API health through Nginx end-to-end — done 2026-09-15
+- [ ] Confirm secret recovery custody/rotation procedure
+- [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments/email remain disabled (not configured)
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
+- [ ] Create a deployment user/process if unattended deployment is ever wanted (currently human sudo only)
+
+**D-002 (first staging deployment) — DONE 2026-09-15 (Ready for review, not Human accepted).** Root task: `../tasks/done/D-002-first-oracle-staging-deployment.md`. Remaining items above are follow-ups, not deployment blockers.
 
 ## 8. Backups
 

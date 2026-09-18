@@ -1,5 +1,25 @@
 # Infrastructure Change Log
 
+## 2026-09-15
+
+### D-002 first staging deployment executed and verified — Ready for review
+
+Deployed the verified application to `sokoladas-demo` for the first time, behind the existing Nginx/TLS edge, using the reconciled `deploy/` configuration. New release `/opt/sokoladas-staging/releases/d002-v1` (Compose project `sokoladas-staging`). Immutable images pulled and verified `linux/arm64`: web `ghcr.io/marijustechin/smshop-web@sha256:ca585562…`, api `ghcr.io/marijustechin/smshop-api@sha256:eab3ee00…`; nginx/certbot/postgres pinned by digest.
+
+Provisioned the seven root-managed secret files under `/etc/sokoladas-staging/secrets/` (values never recorded; ownership per consumer: postgres UID 999, app UID 10001, nginx 101; mode 0400). Initialized PostgreSQL 18 with separate `sokoladas_migration` (schema DDL) and `sokoladas_app` (DML only) roles; the application runtime was proven unable to perform DDL. Applied the single migration `20260913164639_add_authentication_domain` (exit 0, idempotent on re-run). Cut over the proxy from maintenance to application routing while preserving the `letsencrypt`/`acme_webroot` volumes and the trusted certificate (valid to 2026-12-07, both SANs).
+
+Verification (public HTTPS): apex serves the application `200`; `/api/auth/me` unauth `401`; HTTP→HTTPS `308`; `www`→apex `308`; ACME path `404`; only proxy publishes `80/443` (`3000/3001/5432` private). Auth E2E: registration `201`; unverified login `403 EMAIL_NOT_VERIFIED`; verified staging test user login `200`; `/api/auth/me` `200`; refresh cookie rotation (old token replay `401`); logout `204`; post-logout refresh `401`; cookie `HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=604800`. Persistence: full stack `--force-recreate` returned all healthy with data and migration intact and login working; a database-only restart left the API healthy (D-001 DB-reconnect concern did not reproduce under `docker restart`). Repeatability: `deploy.sh deploy` re-run exited `0`.
+
+Limitations: a forced long database outage to independently exercise pool reconnection was not performed; no destructive rollback was executed (rollback boundary: revert the proxy to `section6-https-v1` to restore maintenance, and/or stop `api`/`frontend`; schema is forward-only). No OCI/DNS/firewall/SSH changes were made. Root task coordination: `../tasks/current/D-002-first-oracle-staging-deployment.md`. No commit or push.
+
+### D-002 deployment configuration reconciled and locally validated — Ready for review (not deployed)
+
+Prepared the first live staging deployment configuration against the D-001 reconciled application runtime contract. Reconciled [`deploy/compose.yaml`](deploy/compose.yaml): `api` now receives `NODE_ENV=production`, `PORT=3001`, `WEB_ORIGIN`, and `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with file-backed `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with the separate `sokoladas_migration` role; `session_signing_key` was replaced by `jwt_access_secret`; the frontend sets `NODE_ENV=production`; and `postgres:18` is pinned by immutable digest. Updated [`deploy/db/init/00-create-roles.sh`](deploy/db/init/00-create-roles.sh) to grant the migration role `CREATE`/`USAGE` on schema `public` and the runtime role `USAGE` only, with default privileges for migration-created objects (this gap exists because PostgreSQL 15+ no longer grants `PUBLIC` CREATE on `public`).
+
+Verification was repository-local and disposable: `docker compose config` passes with a digest-pinned `images.env` and renders the exact reconciled environment/secrets; the DB grants path was validated against a disposable PostgreSQL 18 using the published API image (`ghcr.io/marijustechin/smshop-api@sha256:eab3ee…`) — migration exited 0 as `sokoladas_migration`, the runtime role could DML but not DDL, and script syntax checks passed. Read-only host preflight and the public edge (maintenance 503, correct redirects, ACME path, only 22/80/443 public) were confirmed.
+
+No live change was made: the deployment itself (release staging, secret provisioning, image pull, DB initialization, migration, stack startup, proxy activation, end-to-end verification) requires interactive human sudo and remains pending. Root task coordination: `../tasks/current/D-002-first-oracle-staging-deployment.md`. No commit or push.
+
 ## 2026-09-09
 
 ### Single-authoritative contract ownership documented — Ready for review

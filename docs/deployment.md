@@ -1,12 +1,13 @@
 # Section 7 — Deployment foundation (secrets, registry, PostgreSQL, rollback)
 
-**2026-09-09 — Ready for review (foundation only; not deployed).** No application images or production secrets exist yet; nothing here is executed. This records the infra-side mechanisms prepared alongside [`deploy/compose.yaml`](../deploy/compose.yaml), [`deploy/deploy.sh`](../deploy/deploy.sh), [`deploy/images.env.example`](../deploy/images.env.example), [`deploy/proxy/nginx.conf`](../deploy/proxy/nginx.conf) and [`deploy/db/init/`](../deploy/db/init/). The reconcilable contract lives in [application-deployment-contract.md](application-deployment-contract.md).
+**2026-09-15 — Deployed and verified (D-002).** The first staging deployment to `sokoladas-demo` is live and verified; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review) and [CHANGELOG.md](../CHANGELOG.md). This document records the infra-side mechanisms (secrets, registry, PostgreSQL, rollback) alongside [`deploy/compose.yaml`](../deploy/compose.yaml), [`deploy/deploy.sh`](../deploy/deploy.sh), [`deploy/images.env.example`](../deploy/images.env.example), [`deploy/proxy/nginx.conf`](../deploy/proxy/nginx.conf) and [`deploy/db/init/`](../deploy/db/init/). The reconcilable contract lives in [application-deployment-contract.md](application-deployment-contract.md).
 
 ## Image pins (WEB_IMAGE / API_IMAGE)
 
 - Deployment images are supplied externally via `images.env` (`WEB_IMAGE`, `API_IMAGE`), copied from [`images.env.example`](../deploy/images.env.example) and kept outside Git.
 - `deploy.sh validate` **refuses any value that is not `image@sha256:…`**, so mutable tags cannot become production pins.
-- Nginx and Certbot digests are pinned in `deploy/compose.yaml` (already verified `linux/arm64` in Section 6). PostgreSQL uses the `postgres:18` tag as a placeholder; its digest is pinned only after Prisma/ORM compatibility is verified (TODO §7).
+- Nginx and Certbot digests are pinned in `deploy/compose.yaml` (already verified `linux/arm64` in Section 6). PostgreSQL is pinned by digest in `deploy/compose.yaml` (`postgres@sha256:4ef4db…`); Prisma/ORM compatibility with PostgreSQL 18 was verified in D-001.
+- The application packages are public on GHCR, so no server-side registry credential is required; the host still needs docker/sudo to pull.
 
 ## GHCR authentication (no credentials committed)
 
@@ -33,10 +34,10 @@ Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside 
 
 ## PostgreSQL 18 runtime and persistence
 
-- `db` runs `postgres:18` on the internal `db` network with no published ports; `pg_data` (`sokoladas-staging_pg_data`) is mounted at `/var/lib/postgresql`.
+- `db` runs the digest-pinned `postgres` image on the internal `db` network with no published ports; `pg_data` (`sokoladas-staging_pg_data`) is mounted at `/var/lib/postgresql`.
 - Bootstrap uses `POSTGRES_PASSWORD_FILE=/run/secrets/db_admin_password`; the `db_init_*` secrets feed the first-boot role script.
-- The first-boot script creates the application and migration roles with **placeholder names** (`sokoladas_app`, `sokoladas_migration`) that are provisional/application-owned; **schema creation and grants are owned by the application migration** (`prisma migrate deploy`), not by infra. The final role names, database name and grants must come from the application contract before first initialization.
-- **Prisma/ORM compatibility with PostgreSQL 18 remains unverified** and must be confirmed before first initialization or any irreversible data.
+- The first-boot script creates the application (`sokoladas_app`, runtime) and migration (`sokoladas_migration`, schema owner) roles. It grants the migration role `CREATE, USAGE` on schema `public` and the runtime role `USAGE` only, with default privileges so future migration-created tables/sequences are usable by the runtime role. **Schema creation and grants are owned by the application migration** (`prisma migrate deploy`). This grants gap (PostgreSQL 15+ no longer gives `PUBLIC` CREATE on `public`) was fixed and validated locally against PostgreSQL 18 in D-002 preparation.
+- **Prisma/ORM compatibility with PostgreSQL 18 was verified in D-001** (migration and readiness against a disposable PostgreSQL 18); reconfirm during first real initialization.
 
 ## Migration ordering and rollback limitations
 
@@ -44,15 +45,21 @@ Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside 
 - The migration job reuses the API image and exits 0 only on success; a non-zero exit aborts deployment.
 - **Application image rollback is not database rollback.** `deploy.sh rollback` re-selects the previous known-good digests and recreates `frontend`/`api`, but does **not** revert migrations. A destructive or incompatible migration requires a reviewed repair or restore path (backups are Section 8). Do not claim the database is automatically safe merely because images roll back.
 
-## Verification boundaries (cannot yet be verified)
+## Verification status (D-002, 2026-09-15)
 
-Until real digests, secrets and the application schema exist, the following remain unverified and are **not** claimed:
+Verified live on `sokoladas-demo`:
 
-- Real `linux/arm64` application image pull.
-- Real application startup and graceful shutdown.
-- Migration execution against the actual application schema.
-- Frontend/API health through Nginx end-to-end.
-- A clean deployment from scratch.
-- Final application/database public-port isolation after deployment.
+- Real `linux/arm64` application image pull (web/api digests verified on the host).
+- Real application startup; health/readiness on api and frontend.
+- Migration execution against the actual application schema (exit 0; idempotent).
+- Frontend/API health through Nginx end-to-end; `/api` routing.
+- Public-port isolation (only `80/443`; `3000/3001/5432` private).
+- Restart/recreate persistence and a repeat deployment.
 
-Only repository-local validation has been performed (Compose parsing, shell syntax, whitespace/secret scans). No live server change is authorized by this document.
+Still not claimed:
+
+- A forced long database outage to exercise connection-pool reconnection (the D-001 follow-up; it did not reproduce under a `docker restart`).
+- A clean deployment from scratch on a fresh host, and a destructive rollback test (schema is forward-only; no down migration).
+- Secret recovery custody/rotation.
+
+The live deployment itself was human-executed with interactive sudo; this document records the mechanism and verification, not a standing authorization.

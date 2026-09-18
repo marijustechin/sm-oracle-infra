@@ -1,6 +1,6 @@
 # Section 7 — Application deployment contract and image delivery
 
-**2026-09-09 — Ready for review (design + infra foundation prepared; not deployed).** No deployment, no application source access, no live changes, no commit or push. This document is the interface between this infrastructure repository and the application repository, reconciled against the application repository's Human-accepted initial scaffold. It keeps three kinds of statement distinct: **accepted infrastructure decisions (A)**, **proposed application contract defaults (B)**, and **application-owned open fields (C)**. Accepted context: the [Section 5 application architecture](application-architecture.md) is Human accepted (service boundaries, networks, storage/secrets model, canonical hostname, containerized TLS). Nothing here authorizes deployment.
+**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** No live change is authorized by this document itself.
 
 ## Confirmed application runtime facts
 
@@ -195,7 +195,7 @@ The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](
 | `proxy` | Nginx (pinned) | `edge`, `app` | `0.0.0.0:80`/`443` | release `nginx.conf`/`conf.d`; `letsencrypt` ro; `acme_webroot` ro; `staging_access` secret | `unless-stopped`; starts independent of upstreams |
 | `frontend` | `${WEB_IMAGE}` | `app` | none | no secrets; ephemeral `/tmp` | `unless-stopped`, `init: true`, UID 10001 |
 | `api` | `${API_IMAGE}` | `app`, `db` | none | `db_app_password` (as `DB_PASSWORD_FILE`), `jwt_access_secret` (as `JWT_ACCESS_SECRET_FILE`) | `unless-stopped`, `init: true`, UID 10001; `depends_on: db (service_healthy)` |
-| `db` | PostgreSQL 18 (digest to be pinned) | `db` | none | `pg_data` → `/var/lib/postgresql`; init role files | `unless-stopped`; `pg_isready` |
+| `db` | PostgreSQL 18 (digest-pinned) | `db` | none | `pg_data` → `/var/lib/postgresql`; init role files | `unless-stopped`; `pg_isready` |
 | `migrate` | `${API_IMAGE}` | `db` | none | `db_migration_password` (as `DB_PASSWORD_FILE`) | `restart: "no"`, profile `tools`; `prisma migrate deploy` exit 0 gate |
 | `certbot` | certbot (pinned) | `edge` | none | `letsencrypt` rw, `acme_webroot` rw, bounded tmpfs | `unless-stopped` loop |
 
@@ -203,4 +203,4 @@ The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](
 - **Release ordering:** DB healthy → run the migration job to exit 0 → start API/frontend → verify the full request path through the proxy.
 - All services inherit the accepted Docker `local` log policy (10m × 3, compressed). No `container_name`, host network, privileged mode, Docker socket, or host PID namespace.
 
-**Pending infrastructure implementation (recorded in `TODO.md` §7, not changed here):** the current `deploy/compose.yaml` still grants `session_signing_key` to `api` and does not set the database component variables. It must be updated to grant `jwt_access_secret` (as `JWT_ACCESS_SECRET_FILE`) and to provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate`. No Compose file was modified by the 2026-09-15 application reconciliation.
+**Infrastructure implementation status (D-002, 2026-09-15):** the `deploy/compose.yaml` env/secret wiring matches the reconciled interface — `api` receives `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with `DB_USER=sokoladas_migration` and `DB_PASSWORD_FILE`; `session_signing_key` was replaced by `jwt_access_secret`; `postgres` is pinned by digest; and `db/init` grants the migration role schema DDL and the runtime role DML only. The first staging deployment is **live and verified** (release `/opt/sokoladas-staging/releases/d002-v1`); see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review).

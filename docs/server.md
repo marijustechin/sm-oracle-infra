@@ -4,6 +4,21 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## D-002 first staging deployment verified — 2026-09-15 — Ready for review
+
+The first application deployment to `sokoladas-demo` is live and verified behind the existing Nginx/TLS edge. Release `/opt/sokoladas-staging/releases/d002-v1`; Compose project `sokoladas-staging`; containers `proxy`, `certbot`, `api`, `frontend`, `db` all healthy.
+
+- **Images (immutable):** web `ghcr.io/marijustechin/smshop-web@sha256:ca585562…` and api `ghcr.io/marijustechin/smshop-api@sha256:eab3ee00…`, both pulled and `arm64`; infra images pinned by digest (nginx `aed159a7…`, certbot `f70ad0ad…`, postgres `4ef4db…`).
+- **Database:** PostgreSQL 18 on the internal `db` network, `pg_data` volume (`sokoladas-staging_pg_data`); database `sokoladas_staging`; separate runtime role `sokoladas_app` (schema `USAGE`, DML only — DDL denied, proven) and migration role `sokoladas_migration` (schema `CREATE`/`USAGE`, owns migrated objects). One migration applied: `20260913164639_add_authentication_domain`; re-run reports no pending migrations.
+- **Exposure:** only the proxy publishes `0.0.0.0:80`/`443`; `3000`/`3001`/`5432` remain unpublished.
+- **TLS/redirects preserved:** trusted certificate unchanged (Let's Encrypt, 2026-09-08 → 2026-12-07, SANs `sokoladas.eu` + `www.sokoladas.eu`); apex serves the application (`200`), HTTP→HTTPS `308`, `www`→apex `308`, ACME HTTP-01 path `404`; `letsencrypt`/`acme_webroot` volumes preserved.
+- **Auth E2E (public HTTPS):** registration `201`; unverified login correctly `403 EMAIL_NOT_VERIFIED`; verified test user login `200`; `GET /api/auth/me` `200`; refresh rotated the opaque cookie (old token replay `401`); logout `204` with cookie cleared; post-logout refresh `401`. Cookie attributes: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=604800`.
+- **Email strategy:** SMTP is intentionally disabled, so one deliberately created staging test user was registered via the public API and marked verified directly in the database. No global authentication rule was weakened and no bypass was added.
+- **Restart/persistence:** a database-only restart left the API `healthy` (the D-001 DB-reconnect concern did not reproduce under `docker restart`); a full `--force-recreate` of the stack returned all services healthy with data and migration intact and login still working.
+- **Repeatability:** `deploy.sh deploy` re-run exited `0` (idempotent migration, no new public ports).
+
+Not performed: a forced long database outage to independently exercise pool reconnection (the known D-001 follow-up), and a destructive rollback. Rollback boundary: revert the proxy to `/opt/sokoladas-staging/releases/section6-https-v1/https/compose.yaml` to restore maintenance `503` and/or stop `api`/`frontend`; database schema is forward-only (no down migration). No OCI/DNS/firewall/SSH change was made. Ready for review, not Human accepted.
+
 ## Reboot persistence verified — Section 6 closed — 2026-09-08 — Human accepted
 
 A controlled reboot of `sokoladas-demo` was performed and persistence verified. Before/after comparisons: SSH host identity unchanged (`SHA256:Qt7o7y7xOUccDssX6R5xGkOfQ0oKGaEYnQlsZ+0usLI`); served certificate unchanged (`CN=sokoladas.eu`, `Let's Encrypt CN=YE2`, 2026-09-08 → 2026-12-07, fingerprint `B9:5E:66:66…`); saved `rules.v4`/`rules.v6` hashes identical (`02bef650…`/`303649…`); `sshd -T` hash identical (`073d283d…`); Oracle `InstanceServices` chain intact; Docker and containerd enabled and active; proxy (healthy) and certbot containers auto-returned with `0.0.0.0:80`/`443` and `nat DOCKER` DNAT to `172.18.0.2` restored. Externally after reboot: apex HTTPS 503, www 308, HTTP 308, ACME HTTP-01 path 404, TCP 443 reachable, TCP 111/3000/3001/5432 closed, fresh SSH succeeded. Section 6 is closed and Human accepted. A real on-schedule Let's Encrypt renewal and reserved-IPv4 pricing remain operational follow-ups, not claimed as verified.
