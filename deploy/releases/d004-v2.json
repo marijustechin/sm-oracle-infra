@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "d004-v2",
+  "createdAt": "2026-09-22T19:55:50Z",
+  "source": {
+    "repository": "github.com/marijustechin/smshop",
+    "commit": "64cb8c6d01369cf86f5d475ff8ef554a1f6e7944",
+    "ref": "main"
+  },
+  "ci": {
+    "imagesRunId": "35764280629"
+  },
+  "images": {
+    "web": {
+      "ref": "ghcr.io/marijustechin/smshop-web@sha256:b6f3936f540b100570bcdade6fc0b6aa977180756af4446bd6c85ffc0eef87b4",
+      "platform": "linux/arm64",
+      "tag": "sha-64cb8c6d01369cf86f5d475ff8ef554a1f6e7944"
+    },
+    "api": {
+      "ref": "ghcr.io/marijustechin/smshop-api@sha256:b5ce59a63a5ac5cb2beadc591b7219bd45a7c485eef73575666ec57c03266b0a",
+      "platform": "linux/arm64",
+      "tag": "sha-64cb8c6d01369cf86f5d475ff8ef554a1f6e7944"
+    }
+  },
+  "infra": {
+    "contractCommit": "659a1cdbddb22d58fe5b8d2cb4b20d8f7d7c0b13"
+  },
+  "notes": "Corrective Turnstile public-site-key rebuild after d004-v1. Images from Images workflow run 35764280629 attempt 3 (supersedes d004-v1's 506ea172 web digest)."
+}
