@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "d004-v1",
+  "createdAt": "2026-09-22T19:22:29Z",
+  "source": {
+    "repository": "github.com/marijustechin/smshop",
+    "commit": "64cb8c6d01369cf86f5d475ff8ef554a1f6e7944",
+    "ref": "main"
+  },
+  "ci": {
+    "imagesRunId": "35764280629"
+  },
+  "images": {
+    "web": {
+      "ref": "ghcr.io/marijustechin/smshop-web@sha256:506ea1726df745008123a6945e9ad9827665db649c18cd9a93ed5d96f60c9a47",
+      "platform": "linux/arm64",
+      "tag": "sha-64cb8c6d01369cf86f5d475ff8ef554a1f6e7944"
+    },
+    "api": {
+      "ref": "ghcr.io/marijustechin/smshop-api@sha256:25c14d80075986eebdd71311c1d266ec302f03dc3cfd00d767f6b8d130a13437",
+      "platform": "linux/arm64",
+      "tag": "sha-64cb8c6d01369cf86f5d475ff8ef554a1f6e7944"
+    }
+  },
+  "infra": {
+    "contractCommit": "7412851b8fd303fe62edb3b8561f96cc3fc1fe35"
+  },
+  "notes": "Updated auth images + Turnstile build configuration + staging SMTP/egress; Turnstile secret wired into the API. Images from the Images workflow run 35764280629 attempt 2."
+}
