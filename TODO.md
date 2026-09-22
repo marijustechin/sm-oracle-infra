@@ -17,7 +17,8 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 - [x] Provision the staging secrets (root-managed files under `/etc/sokoladas-staging/secrets/`) — done 2026-09-15 (values not recorded; ownership/mode verified). Recovery custody/rotation confirmation remains open
 - [x] Execute deployment (`deploy/deploy.sh deploy`) and verify frontend/API health through Nginx end-to-end — done 2026-09-15
 - [ ] Confirm secret recovery custody/rotation procedure
-- [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments/email remain disabled (not configured)
+- [ ] Deploy staging transactional email (SMTP). Repository wiring is prepared (2026-09-18): `api` receives the `SMTP_*`/`MAIL_FROM` group from `deploy/smtp.env` (host-only template `smtp.env.example`), the password is the root-managed `smtp_password` file secret (app UID 10001, 0400) mounted as `SMTP_PASSWORD_FILE`, and `api` joins the outbound-only `egress` network (no published ports; `app`/`db` remain internal). Remaining: provide the staging `smtp.env` values and secret file, add the provider's DNS/SPF/DKIM authorization, and deploy under a separately authorized task. Application side is implemented and locally real-email-verified (`smshop/docs/email.md`); contract C.2.6/8
+- [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments remain disabled (SMTP enablement is tracked above)
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
 - [ ] Create a deployment user/process if unattended deployment is ever wanted (currently human sudo only)
 

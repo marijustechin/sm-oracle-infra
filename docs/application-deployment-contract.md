@@ -48,6 +48,22 @@ and API `/health/ready` returned `200`; `prisma migrate deploy` from the
 published API image exited `0` against PostgreSQL 18; registration returned
 `201`. The digests are the deployment pin; the SHA tag is traceability only.
 
+### Newly published application images — 2026-09-22 (pending deployment)
+
+A newer pair of immutable `linux/arm64` images was published by the application
+repository's `Images` workflow (run `35754237865`, source commit
+`070e68076c875c737e928d76703baf1b0d80bd9f`, CI run `35754237630` green). These
+are the deployable references for the next authorized staging release; the
+`d002-v1` release remains what is currently running until then.
+
+| Image | Reference (immutable) | Platform |
+|---|---|---|
+| Web (`WEB_IMAGE`) | `ghcr.io/marijustechin/smshop-web@sha256:74e39c382a0d44cd5bee0ee17f454c2b9f0b9b63bb6bccf916ae508b3d57bf19` | `linux/arm64` |
+| API (`API_IMAGE`) | `ghcr.io/marijustechin/smshop-api@sha256:e92294ad9c199f78030a170b476d2fc795fcbe6ace4de53049568da344dbe378` | `linux/arm64` |
+
+Source SHA tag (traceability, not the deploy reference):
+`sha-070e68076c875c737e928d76703baf1b0d80bd9f`.
+
 ### Reconciled application runtime interface — 2026-09-15
 
 Application-owned names/semantics (authoritative detail in
@@ -63,7 +79,8 @@ records the interface only; it does not invent secret values.
 | `WEB_ORIGIN` | api | `https://sokoladas.eu` (CORS + email links) |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` | api, migrate | nonsecret DB components; port defaults `5432` |
 | `JWT_ACCESS_TTL`, `AUTH_SESSION_TTL` | api | optional; defaults `15m`/`7d` |
-| SMTP/Google/Turnstile blocks | api | optional; all-or-none groups, disabled when absent |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM` | api | nonsecret SMTP group; supplied via `deploy/smtp.env` (host-only) |
+| Google/Turnstile blocks | api | optional; all-or-none groups, disabled when absent |
 
 **File-backed secrets** (`<NAME>_FILE`, raw value; one trailing newline tolerated)
 
@@ -72,7 +89,7 @@ records the interface only; it does not invent secret values.
 | `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`) | api | application DB login |
 | `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`) | migrate | migration DB login (separate role) |
 | `JWT_ACCESS_SECRET_FILE` | api | signs access JWTs and derives the OAuth transaction key |
-| `SMTP_PASSWORD_FILE` | api | optional (mail disabled initially) |
+| `SMTP_PASSWORD_FILE` | api | SMTP login password (staging secret file `smtp_password`) |
 | `GOOGLE_CLIENT_SECRET_FILE` | api | optional |
 | `TURNSTILE_SECRET_KEY_FILE` | api | optional |
 
@@ -173,9 +190,42 @@ These values are supplied by the application project and are not invented by inf
 
 ### C.2 Product-dependent, still unresolved
 
-6. Egress requirements — whether any server-side outbound Internet is needed (none initially).
+6. Egress requirements — SMTP (transactional email) is the first concrete
+   integration that needs server-side outbound Internet. The accepted
+   architecture gives the API **no initial outbound access** (`app`/`db` are
+   internal); the dedicated, outbound-only `egress` network is **prepared in
+   `deploy/compose.yaml`** (only `api` attached; no ports published). No other
+   egress is required today. See "Staging SMTP enablement" below.
 7. Persistent storage beyond PostgreSQL (e.g. uploads) — none required now; revisit only if uploads are approved.
-8. Additional secrets beyond `JWT_ACCESS_SECRET` / DB credentials (e.g. sandbox payment or email provider keys) and their exact names.
+8. Additional secrets beyond `JWT_ACCESS_SECRET` / DB credentials — the SMTP
+   password is the next concrete secret (see below); sandbox payment or other
+   provider keys remain undefined.
+
+### Staging SMTP enablement (infra wiring prepared 2026-09-18 — not deployed)
+
+The application implements the provider-independent SMTP interface
+(`smshop/docs/email.md`); the real local flow was verified against the
+administrator's SMTP account (registration/verification/resend/password
+recovery). The staging infrastructure wiring is prepared in this repository:
+
+- the nonsecret `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` /
+  `MAIL_FROM` values are supplied via `deploy/smtp.env` (host-only, git-ignored;
+  template `deploy/smtp.env.example`), interpolated into the `api` service as
+  required `${VAR:?…}` values;
+- the password is the root-managed `smtp_password` secret file under
+  `/etc/sokoladas-staging/secrets/` owned by app UID `10001` mode `0400`, mounted
+  as `SMTP_PASSWORD_FILE` (same model as `jwt_access_secret`);
+- the API joins the outbound-only `egress` network in `deploy/compose.yaml`
+  (bridge, not internal; no published ports; only `api` attached). `app`/`db`
+  remain internal, PostgreSQL stays private, and only the proxy publishes
+  `80`/`443`;
+- the security implication is recorded in `docs/deployment.md`: the API gains
+  unrestricted outbound Internet (no per-provider allowlist).
+
+Remaining before live email: provide the staging provider values + secret file,
+add the provider's DNS/SPF/DKIM authorization, and deploy under a separate
+authorized task. Tracked in `TODO.md` §7. No SMTP credential value is recorded
+here.
 
 ## Image delivery model (recommended initial)
 

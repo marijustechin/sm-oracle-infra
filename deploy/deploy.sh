@@ -10,6 +10,9 @@ RELEASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$RELEASE_DIR/compose.yaml"
 IMAGES_ENV="$RELEASE_DIR/images.env"
 PREV_IMAGES_ENV="$RELEASE_DIR/images.env.prev"
+# Nonsecret staging SMTP settings (host/port/secure/user/from). The SMTP
+# password is a root-managed file secret, never sourced from here.
+SMTP_ENV="$RELEASE_DIR/smtp.env"
 PROJECT="sokoladas-staging"
 
 compose() { docker compose -p "$PROJECT" -f "$COMPOSE_FILE" "$@"; }
@@ -20,18 +23,22 @@ require_digest() {
   [[ "$value" == *"@sha256:"* ]] || die "$name is not an immutable digest (got: ${value:-<unset>}); supply image@sha256:…"
 }
 
-load_images() {
+load_env() {
   [[ -f "$IMAGES_ENV" ]] || die "missing $IMAGES_ENV"
+  [[ -f "$SMTP_ENV" ]] || die "missing $SMTP_ENV (nonsecret SMTP_HOST/SMTP_PORT/SMTP_SECURE/SMTP_USER/MAIL_FROM)"
   # shellcheck disable=SC1090
-  set -a; source "$IMAGES_ENV"; set +a
+  set -a; source "$IMAGES_ENV"; source "$SMTP_ENV"; set +a
   require_digest "${WEB_IMAGE:-}" "WEB_IMAGE"
   require_digest "${API_IMAGE:-}" "API_IMAGE"
+  for name in SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER MAIL_FROM; do
+    [[ -n "${!name:-}" ]] || die "$name must be set in $SMTP_ENV"
+  done
 }
 
 validate() {
-  load_images
+  load_env
   compose config --quiet || die "compose config failed"
-  echo "validate OK: WEB_IMAGE/API_IMAGE are digest-pinned"
+  echo "validate OK: WEB_IMAGE/API_IMAGE are digest-pinned; SMTP settings present"
 }
 
 preflight() {

@@ -78,7 +78,10 @@ services:
     user: '10001:10001'
     init: true
     restart: unless-stopped
-    networks: [app, db]
+    # `egress` is the only non-internal network for the API and exists solely to
+    # allow approved outbound integrations (currently SMTP). It publishes no
+    # ports and only `api` is attached. `app` and `db` stay internal.
+    networks: [app, db, egress]
     depends_on:
       db:
         condition: service_healthy
@@ -95,9 +98,18 @@ services:
       # the password file (never rendered into a nonsecret env value).
       DB_PASSWORD_FILE: /run/secrets/db_app_password
       JWT_ACCESS_SECRET_FILE: /run/secrets/jwt_access_secret
+      # Transactional email (all-or-none application group). Nonsecret values
+      # come from smtp.env (outside Git); the password is a file secret below.
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in smtp.env}
+      SMTP_PORT: ${SMTP_PORT:?set SMTP_PORT in smtp.env}
+      SMTP_SECURE: ${SMTP_SECURE:?set SMTP_SECURE in smtp.env}
+      SMTP_USER: ${SMTP_USER:?set SMTP_USER in smtp.env}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in smtp.env}
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
     secrets:
       - db_app_password
       - jwt_access_secret
+      - smtp_password
     healthcheck:
       test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:3001/health/ready']
       interval: 10s
@@ -182,6 +194,12 @@ networks:
     driver: bridge
     internal: true
     enable_ipv6: false
+  # Approved outbound-only path for the API (SMTP). Not internal so Docker's
+  # NAT gives outbound Internet access; no ports are published and only `api`
+  # joins it. Inbound isolation is unchanged (`app`/`db` remain internal).
+  egress:
+    driver: bridge
+    enable_ipv6: false
 
 volumes:
   pg_data:
@@ -208,5 +226,7 @@ secrets:
     file: /etc/sokoladas-staging/secrets/db_init_migration_password
   jwt_access_secret:
     file: /etc/sokoladas-staging/secrets/jwt_access_secret
+  smtp_password:
+    file: /etc/sokoladas-staging/secrets/smtp_password
   staging_access:
     file: /etc/sokoladas-staging/secrets/staging_access

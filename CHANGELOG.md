@@ -1,5 +1,63 @@
 # Infrastructure Change Log
 
+## 2026-09-22
+
+### Newer application image digests recorded (not deployed) — Ready for review
+
+Recorded the newer immutable `linux/arm64` application images published by the
+application repository after the authentication convergence work: web
+`ghcr.io/marijustechin/smshop-web@sha256:74e39c38…` and api
+`ghcr.io/marijustechin/smshop-api@sha256:e92294ad…`, source commit `070e680`
+(Images run `35754237865`, CI run `35754237630`), in
+[docs/application-deployment-contract.md](docs/application-deployment-contract.md).
+Platforms verified via the public GHCR manifest index (`linux/arm64`). No host or
+OCI change; the running `d002-v1` release is unchanged. Deploying these images
+(and the SMTP/egress preparation from 2026-09-18) requires a separate explicit
+authorization. Ready for review, not Human accepted. No push.
+
+## 2026-09-18
+
+### Staging SMTP wiring and API egress prepared — Ready for review
+
+Wired the reconciled SMTP interface into the Section 7 Compose model so the API
+can send transactional email once the staging provider values are supplied. No
+live change and no deployment.
+
+- `deploy/compose.yaml`: the `api` service now receives `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM` (required `${VAR:?…}` interpolation),
+  `SMTP_PASSWORD_FILE=/run/secrets/smtp_password`, and the new `smtp_password`
+  file secret (`/etc/sokoladas-staging/secrets/smtp_password`). The API joins a
+  new outbound-only `egress` bridge network (not internal, no published ports);
+  `app` and `db` remain internal and PostgreSQL stays private.
+- `deploy/smtp.env.example` (new, nonsecret template) and `.gitignore`
+  (`smtp.env`, `images.env`, `images.env.*` host-only) keep provider values out
+  of Git. `deploy/deploy.sh` now sources `smtp.env` and fails `validate` when any
+  SMTP setting is missing.
+- Documentation: `docs/deployment.md` records the SMTP secret/env model, the
+  egress network, and its security implications (the API gains unrestricted
+  outbound Internet; no per-provider allowlist); it also reconciles the stale
+  `session_signing_key` secret row to `jwt_access_secret`.
+  `docs/application-deployment-contract.md` marks the SMTP/egress fields as
+  prepared; `TODO.md` §7 narrows the remaining work to supplying values,
+  DNS/SPF/DKIM, and a separately authorized deploy.
+
+Why: registration could not deliver verification email on staging because no
+SMTP was configured and the API had no outbound path. The application side was
+already implemented and is now locally real-email-verified (registration,
+verification, resend, password recovery) against the administrator's SMTP
+account; this entry prepares the infrastructure half only.
+
+Verification: the Compose model was rendered with placeholder image digests and
+SMTP values (`docker compose config`) to confirm required interpolation,
+`SMTP_PASSWORD_FILE`, and that only the proxy publishes `80`/`443`
+(`api`/`db`/`frontend` publish nothing; `app`/`db` internal). `deploy.sh` shell
+syntax was checked. The change was **not** applied to the host.
+
+Limitations: not deployed; no live SMTP send from the staging host; egress is
+unrestricted (no destination allowlist); the provider's DNS/SPF/DKIM
+authorization and the secret file are not yet provided. Review status: Ready for
+review, not Human accepted. No commit or push is implied.
+
 ## 2026-09-15
 
 ### D-002 first staging deployment executed and verified — Ready for review

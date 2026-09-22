@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Deploy-time env files are host-only (nonsecret values and image pins) and
+# must never be committed; only their `.example` templates are tracked.
+images.env
+images.env.*
+smtp.env
+
 # Private-key filenames (not a substitute for checking the diff).
 *.key
 id_rsa

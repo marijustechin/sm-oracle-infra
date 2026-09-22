@@ -17,7 +17,7 @@
 
 ## Secret delivery structure and permissions
 
-Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside Git), mounted as file-backed Compose secrets at the documented targets. The accepted Section 5 names are used as the infra-side model; the exact application-side consumption (env mapping, `*_FILE` support) remains an open contract field (C.1.3/C.1.4).
+Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside Git), mounted as file-backed Compose secrets at the documented targets. The reconciled application-side names (`*_FILE` support) are recorded in the contract; this repository owns the file names, mounts, ownership and rotation.
 
 | Secret | Consumers | Purpose | File ownership (accepted model) |
 |---|---|---|---|
@@ -26,11 +26,45 @@ Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside 
 | `db_migration_password` | `db` (init), `migrate` | schema/migration login | app UID 10001, 0400 |
 | `db_init_app_password` | `db` (init only) | init-script copy of the app password | postgres image UID, 0400 |
 | `db_init_migration_password` | `db` (init only) | init-script copy of the migration password | postgres image UID, 0400 |
-| `session_signing_key` | `api` | staging session/signing material | app UID 10001, 0400 |
+| `jwt_access_secret` | `api` | staging access-token/OAuth-transaction signing material | app UID 10001, 0400 |
+| `smtp_password` | `api` | SMTP login password (`SMTP_PASSWORD_FILE`) | app UID 10001, 0400 |
 | `staging_access` | `proxy` | htpasswd hash file for the invited-access gate | Nginx worker UID, 0400 |
 
 - The parent directory is `root:root 0700`. The `db_init_*` copies exist because PostgreSQL's init scripts run as the database OS user, not root; both copies must be kept synchronized during rotation.
 - No secret value is generated in this task; the model and ownership are recorded, not the material.
+
+## SMTP enablement and API egress
+
+Transactional email is an approved API outbound integration. The application
+implements the provider-independent SMTP interface (`smshop/docs/email.md`); the
+infrastructure side is prepared here and is **not yet deployed**.
+
+- **Nonsecret settings** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+  `MAIL_FROM`) are supplied in `deploy/smtp.env` (host-only, git-ignored; copy
+  from `deploy/smtp.env.example`). `compose.yaml` requires them via `${VAR:?…}`
+  and `deploy.sh validate` fails if any is missing. They are not stored in
+  Compose or Git.
+- **Password** is the root-managed file secret `smtp_password`
+  (`/etc/sokoladas-staging/secrets/smtp_password`, owner app UID 10001, mode
+  `0400`), mounted read-only and consumed as `SMTP_PASSWORD_FILE`. It is never
+  placed in Compose, `smtp.env`, or Git.
+- **Egress network:** `api` joins the non-internal `egress` bridge network. That
+  is the only network change and it gives the API the outbound Internet access
+  SMTP requires. No ports are published on `egress`, and only `api` is attached.
+- **Inbound isolation is unchanged:** `app` and `db` remain internal; only the
+  proxy publishes `80`/`443`; the API, frontend, and PostgreSQL publish nothing.
+  PostgreSQL stays on the internal `db` network only.
+
+Security implications of the egress change:
+
+- The API gains **unrestricted outbound** Internet access, not a per-provider
+  allowlist. Outbound destinations are not restricted by this change; restricting
+  them further would need host/Docker firewall rules (not implemented).
+- The API is not reachable inbound through `egress`; only containers attached to
+  that network could reach it and none are. No host/public port is added.
+- Docker's embedded DNS on `egress` resolves the provider hostname; the API must
+  be restarted (recreated) after secret/env changes, since config is read at
+  startup.
 
 ## PostgreSQL 18 runtime and persistence
 
