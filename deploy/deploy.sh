@@ -34,6 +34,7 @@ RELEASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${SOKOLADAS_COMPOSE_FILE:-$RELEASE_DIR/compose.yaml}"
 IMAGES_ENV="${SOKOLADAS_IMAGES_ENV:-$RELEASE_DIR/images.env}"
 SMTP_ENV="${SOKOLADAS_SMTP_ENV:-$RELEASE_DIR/smtp.env}"
+GOOGLE_ENV="${SOKOLADAS_GOOGLE_ENV:-$RELEASE_DIR/google.env}"
 MANIFEST_DIR="${SOKOLADAS_MANIFEST_DIR:-$RELEASE_DIR/releases}"
 STATE_DIR="${SOKOLADAS_STATE_DIR:-/opt/sokoladas-staging/state}"
 EVIDENCE_DIR="${SOKOLADAS_EVIDENCE_DIR:-/opt/sokoladas-staging/evidence}"
@@ -252,13 +253,20 @@ finish_failure() {
 load_env() {
   [[ -f "$IMAGES_ENV" ]] || { fail "missing $IMAGES_ENV (generate it from a release manifest with: ./deploy.sh release <id>)"; return 1; }
   [[ -f "$SMTP_ENV" ]] || { fail "missing $SMTP_ENV (nonsecret SMTP_HOST/SMTP_PORT/SMTP_SECURE/SMTP_USER/MAIL_FROM)"; return 1; }
+  [[ -f "$GOOGLE_ENV" ]] || { fail "missing $GOOGLE_ENV (nonsecret GOOGLE_CLIENT_ID/GOOGLE_CALLBACK_URL)"; return 1; }
   # shellcheck disable=SC1090
-  set -a; source "$IMAGES_ENV"; source "$SMTP_ENV"; set +a
+  set -a; source "$IMAGES_ENV"; source "$SMTP_ENV"; source "$GOOGLE_ENV"; set +a
   require_digest "${WEB_IMAGE:-}" "WEB_IMAGE" || return 1
   require_digest "${API_IMAGE:-}" "API_IMAGE" || return 1
   local name
   for name in SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER MAIL_FROM; do
     [[ -n "${!name:-}" ]] || { fail "$name must be set in $SMTP_ENV"; return 1; }
+  done
+  # Google is all-or-none in the application. Require the nonsecret pair here so
+  # the release never renders a partial Google configuration; the client secret
+  # is supplied separately as the google_client_secret file secret.
+  for name in GOOGLE_CLIENT_ID GOOGLE_CALLBACK_URL; do
+    [[ -n "${!name:-}" ]] || { fail "$name must be set in $GOOGLE_ENV"; return 1; }
   done
 }
 

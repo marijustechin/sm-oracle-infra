@@ -8,6 +8,7 @@
 images.env
 images.env.*
 smtp.env
+google.env
 
 # Private-key filenames (not a substitute for checking the diff).
 *.key

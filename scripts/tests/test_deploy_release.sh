@@ -17,6 +17,7 @@ trap 'rm -rf "$WORK"' EXIT
 export SOKOLADAS_MANIFEST_DIR="$WORK/manifests"
 export SOKOLADAS_IMAGES_ENV="$WORK/images.env"
 export SOKOLADAS_SMTP_ENV="$WORK/smtp.env"
+export SOKOLADAS_GOOGLE_ENV="$WORK/google.env"
 export SOKOLADAS_STATE_DIR="$WORK/state"
 export SOKOLADAS_EVIDENCE_DIR="$WORK/evidence"
 export SOKOLADAS_COMPOSE_FILE="$WORK/compose.yaml"
@@ -72,6 +73,10 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=example
 MAIL_FROM="Example <noreply@example.invalid>"
+ENV
+cat >"$SOKOLADAS_GOOGLE_ENV" <<'ENV'
+GOOGLE_CLIENT_ID=example-client-id.apps.googleusercontent.com
+GOOGLE_CALLBACK_URL=https://sokoladas.eu/api/auth/google/callback
 ENV
 
 write_manifest "$SOKOLADAS_MANIFEST_DIR/rel-1.json" "rel-1" "$WEB_REF" "$API_REF"

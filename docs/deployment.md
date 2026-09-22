@@ -61,6 +61,7 @@ Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside 
 | `jwt_access_secret` | `api` | staging access-token/OAuth-transaction signing material | app UID 10001, 0400 |
 | `smtp_password` | `api` | SMTP login password (`SMTP_PASSWORD_FILE`) | app UID 10001, 0400 |
 | `turnstile_secret_key` | `api` | Cloudflare Turnstile backend secret (`TURNSTILE_SECRET_KEY_FILE`) | app UID 10001, 0400 |
+| `google_client_secret` | `api` | Google OAuth client secret (`GOOGLE_CLIENT_SECRET_FILE`) | app UID 10001, 0400 |
 | `staging_access` | `proxy` | htpasswd hash file for the invited-access gate | Nginx worker UID, 0400 |
 
 - The parent directory is `root:root 0700`. The `db_init_*` copies exist because PostgreSQL's init scripts run as the database OS user, not root; both copies must be kept synchronized during rotation.
@@ -85,6 +86,29 @@ Cloudflare Turnstile spans build-time and runtime configuration:
 When the secret file is present and readable, the API enforces the challenge on
 the protected auth endpoints and fails closed; when it is absent the feature is
 disabled. The value is never logged or captured in evidence.
+
+## Google OAuth enablement
+
+Google OAuth is an optional, all-or-none application group (`GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`); when the whole group is absent
+the API reports `google:false` and the frontend hides the Google action
+(`GET /api/auth/capabilities`). The application behaviour is unchanged; this is
+staging configuration only.
+
+- **Nonsecret config (host-only):** `deploy/google.env` (template
+  `deploy/google.env.example`) supplies `GOOGLE_CLIENT_ID` (the public web client
+  ID) and `GOOGLE_CALLBACK_URL`
+  (`https://sokoladas.eu/api/auth/google/callback`, which must match the Google
+  Cloud OAuth client's Authorized redirect URI exactly). `deploy.sh` sources it
+  and `compose.yaml` requires both, so a release cannot render a partial Google
+  configuration.
+- **Client secret (host-only):** the root-managed file
+  `/etc/sokoladas-staging/secrets/google_client_secret` (owner app UID `10001`,
+  mode `0400`), mounted read-only and consumed as
+  `GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google_client_secret`. Never committed,
+  never in GitHub Actions or release manifests.
+- **No web rebuild required:** the frontend learns Google availability at runtime
+  from the capability endpoint, so enabling Google reuses the deployed images.
 
 ## SMTP enablement and API egress
 

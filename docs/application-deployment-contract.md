@@ -96,6 +96,7 @@ records the interface only; it does not invent secret values.
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` | api, migrate | nonsecret DB components; port defaults `5432` |
 | `JWT_ACCESS_TTL`, `AUTH_SESSION_TTL` | api | optional; defaults `15m`/`7d` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM` | api | nonsecret SMTP group; supplied via `deploy/smtp.env` (host-only) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL` | api | nonsecret Google group; supplied via `deploy/google.env` (host-only); all-or-none with the client secret |
 | Google/Turnstile blocks | api | optional; all-or-none groups, disabled when absent |
 
 **File-backed secrets** (`<NAME>_FILE`, raw value; one trailing newline tolerated)
@@ -106,7 +107,7 @@ records the interface only; it does not invent secret values.
 | `DB_PASSWORD_FILE` (or `DATABASE_URL_FILE`) | migrate | migration DB login (separate role) |
 | `JWT_ACCESS_SECRET_FILE` | api | signs access JWTs and derives the OAuth transaction key |
 | `SMTP_PASSWORD_FILE` | api | SMTP login password (staging secret file `smtp_password`) |
-| `GOOGLE_CLIENT_SECRET_FILE` | api | optional |
+| `GOOGLE_CLIENT_SECRET_FILE` | api | Google OAuth client secret (staging secret file `google_client_secret`); optional, all-or-none with `GOOGLE_CLIENT_ID`/`GOOGLE_CALLBACK_URL` |
 | `TURNSTILE_SECRET_KEY_FILE` | api | Cloudflare Turnstile backend secret (staging secret file `turnstile_secret_key`); optional, enables challenge enforcement when present |
 
 **Frontend (build-time, public, inlined by Next.js)**

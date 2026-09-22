@@ -2,6 +2,32 @@
 
 ## 2026-09-22
 
+### Google OAuth staging wiring (D-005) — Ready for review
+
+Wired the staging Google OAuth runtime configuration ahead of the `d005-v1`
+release. Application behaviour is unchanged; this is staging configuration only.
+
+- [`deploy/compose.yaml`](deploy/compose.yaml): `api` receives `GOOGLE_CLIENT_ID`
+  and `GOOGLE_CALLBACK_URL` (required interpolation from host-only `google.env`)
+  and `GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google_client_secret`; the new
+  `google_client_secret` secret resolves to
+  `/etc/sokoladas-staging/secrets/google_client_secret` (owner app UID 10001, mode
+  0400). The client secret is never rendered into an environment value.
+- [`deploy/deploy.sh`](deploy/deploy.sh): sources and validates `google.env`, so a
+  release cannot render a partial Google configuration (fail-fast); no other
+  deployment behaviour changed.
+- `deploy/google.env.example` (nonsecret template) and `.gitignore` (`google.env`).
+- Docs: [`docs/deployment.md`](docs/deployment.md) and
+  [`docs/application-deployment-contract.md`](docs/application-deployment-contract.md)
+  record the Google env/secret model and that enabling Google needs **no web image
+  rebuild** (availability is reported at runtime by the capability endpoint).
+
+Verification: `docker compose config` shows the Google env/secret wiring, with
+SMTP/Turnstile/DB/JWT unchanged, only the proxy publishing ports, and a fail-fast
+when a required Google value is missing (`scripts/tests/test_deploy_google.sh`,
+14 checks); existing resolver/deploy tests pass; `bash -n deploy/deploy.sh`. No
+host or OCI change. Ready for review, not Human accepted.
+
 ### D-004 corrective release d004-v2 (Turnstile site-key fix) — Ready for review
 
 Live registration on `d004-v1` failed with Cloudflare Turnstile error `400020`

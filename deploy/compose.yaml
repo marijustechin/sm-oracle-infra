@@ -110,11 +110,18 @@ services:
       # enforces the challenge; the public site key is baked into the web image
       # at build time. The secret value is never rendered into an env variable.
       TURNSTILE_SECRET_KEY_FILE: /run/secrets/turnstile_secret_key
+      # Google OAuth (all-or-none application group). Nonsecret values come from
+      # google.env (outside Git); the client secret is a file secret below. When
+      # the whole group is absent the API reports google:false (disabled).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID in google.env}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:?set GOOGLE_CALLBACK_URL in google.env}
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
     secrets:
       - db_app_password
       - jwt_access_secret
       - smtp_password
       - turnstile_secret_key
+      - google_client_secret
     healthcheck:
       test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:3001/health/ready']
       interval: 10s
@@ -235,5 +242,7 @@ secrets:
     file: /etc/sokoladas-staging/secrets/smtp_password
   turnstile_secret_key:
     file: /etc/sokoladas-staging/secrets/turnstile_secret_key
+  google_client_secret:
+    file: /etc/sokoladas-staging/secrets/google_client_secret
   staging_access:
     file: /etc/sokoladas-staging/secrets/staging_access
