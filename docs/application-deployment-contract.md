@@ -64,6 +64,18 @@ are the deployable references for the next authorized staging release; the
 Source SHA tag (traceability, not the deploy reference):
 `sha-070e68076c875c737e928d76703baf1b0d80bd9f`.
 
+### Build/release metadata (ARCH-003 / ARCH-004)
+
+The application repository's `Images` workflow publishes a non-secret build
+manifest artifact (`release-manifest`) carrying the immutable `@sha256:` web/API
+references and the source commit. Infrastructure consumes an **approved staging
+release manifest** (`deploy/releases/<release-id>.json`, non-secret), validates it
+(immutable digests, `linux/arm64`, schema version) and generates the host-only
+`images.env`; `deploy.sh release <release-id>` then applies it and records
+host-only applied state and deployment evidence (`docs/deployment.md`). The build
+manifest never contains deployment state; applied state and evidence are host-only
+and never committed.
+
 ### Reconciled application runtime interface — 2026-09-15
 
 Application-owned names/semantics (authoritative detail in

@@ -90,6 +90,21 @@ class ResolveReleaseManifestTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIsNone(output)
 
+    def test_wrong_platform_rejected(self):
+        manifest = valid_manifest()
+        manifest["images"]["api"]["platform"] = "linux/amd64"
+        result, output = self.invoke(json.dumps(manifest))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIsNone(output)
+
+    def test_absent_platform_accepted(self):
+        manifest = valid_manifest()
+        del manifest["images"]["web"]["platform"]
+        del manifest["images"]["api"]["platform"]
+        result, output = self.invoke(json.dumps(manifest))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(output, f"WEB_IMAGE={WEB_REF}\nAPI_IMAGE={API_REF}\n")
+
     def test_wrong_schema_version_rejected(self):
         manifest = valid_manifest()
         manifest["schemaVersion"] = 2

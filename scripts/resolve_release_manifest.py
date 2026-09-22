@@ -70,6 +70,9 @@ def image_ref(images: dict, key: str) -> str:
     entry = images.get(key)
     if not isinstance(entry, dict):
         raise ManifestError(f"images.{key} is missing")
+    platform = entry.get("platform")
+    if platform is not None and platform != "linux/arm64":
+        raise ManifestError(f"images.{key}.platform must be 'linux/arm64', got: {platform!r}")
     return require_digest_ref(entry.get("ref"), f"images.{key}.ref")
 
 

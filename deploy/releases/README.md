@@ -9,7 +9,7 @@ Nothing here is a secret, and nothing here deploys anything by itself.
 |---|---|---|
 | **Build manifest** | What the `smshop` CI built: source commit and immutable image digests. Contains no deployment state. | Produced by the `smshop` `Images` workflow as the `release-manifest` artifact (and its run summary). Not committed here. |
 | **Approved staging release manifest** | What the operator intends to deploy: a build manifest plus a staging `releaseId`, the expected infra commit, and optional notes. | Committed here as `deploy/releases/<release-id>.json`. This is the human review/approval artifact. |
-| **Host applied state** | What actually ran on the host. | Host-only (planned `applied.json` / release history in ARCH-004); never committed. |
+| **Host applied state** | What actually ran on the host. | Host-only `/opt/sokoladas-staging/state/applied.json` (+ `state/history/`), written by `deploy.sh release` only after a successful deploy; never committed. |
 
 In short: **desired release** (this directory) vs **applied release** (host) vs
 **deployment evidence** (host, plus the infra `CHANGELOG.md`). Do not conflate
@@ -79,9 +79,11 @@ API_IMAGE=ghcr.io/<owner>/smshop-api@sha256:<64 hex>
 python3 scripts/resolve_release_manifest.py deploy/releases/<release-id>.json --out images.env
 ```
 
-`images.env` stays **host-only** and git-ignored. `deploy.sh` already refuses any
-value that is not an immutable `@sha256:` digest. The resolver is metadata
-preparation only; the human still runs the deployment (ADMIN/ARCH-004).
+`images.env` stays **host-only** and git-ignored. `deploy.sh release <release-id>`
+invokes this resolver as its first step and refuses any value that is not an
+immutable `@sha256:` digest. Running the resolver directly is only needed for
+inspection; the supported path is the `release` command (see
+`docs/deployment.md`).
 
 ## Example
 

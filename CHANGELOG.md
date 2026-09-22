@@ -2,6 +2,42 @@
 
 ## 2026-09-22
 
+### Manifest-driven deployment hardening (ARCH-004) — Ready for review
+
+Extended [`deploy/deploy.sh`](deploy/deploy.sh) into a manifest-driven release
+workflow (Model C: human-authorized, human-executed). No live change and no
+deployment.
+
+- `release <release-id>` loads and validates `releases/<release-id>.json` (schema
+  version, release id, source commit, immutable `@sha256:` refs, `linux/arm64`
+  platform), stages the host-only `images.env` via the resolver, validates Compose
+  and port isolation, pulls images before touching running services, starts the
+  DB, runs the migration explicitly (aborting before starting the app on failure),
+  starts API/frontend/proxy/certbot, then runs health/smoke checks. Applied state
+  and success evidence are written only after success.
+- Host-only applied state `/opt/sokoladas-staging/state/applied.json` (`releaseId`,
+  `appliedAt`, `appliedBy`, source commit, web/API refs, infra commit,
+  `previousReleaseId`), written atomically only after success; history under
+  `state/history/`. Never committed, no secrets.
+- `rollback <release-id|previous>` restores an explicitly approved previous
+  release, recreating only `frontend`/`api`, failing closed when no target is
+  recorded, never running destructive database actions, and warning that the schema
+  is not reverted. Replaces the fragile `images.env.prev` model.
+- Non-destructive health/smoke checks: `compose ps`, internal proxy/frontend/API
+  readiness, an only-the-proxy-publishes assertion, and public apex/redirect/ACME/
+  unauthenticated-401 checks (`SOKOLADAS_SKIP_PUBLIC=1` to skip public checks). No
+  data is created.
+- Deployment evidence under `/opt/sokoladas-staging/evidence/<timestamp>-<id>/`
+  (manifest, generated `images.env`, compose/migration/health logs, `summary.txt`
+  with `finalStatus`), retained on failure. Non-secret only.
+- Resolver now also rejects a non-`linux/arm64` platform when present.
+
+Verification: `bash -n deploy/deploy.sh`; `scripts/tests/test_deploy_release.sh`
+(32 checks covering manifest/state/rollback/health plus success and failure paths,
+no DB-volume-destructive command, no Docker socket, no SSH/passwordless access);
+resolver tests 14/14; `docker compose config` unchanged/valid. No host or OCI
+change. Ready for review, not Human accepted.
+
 ### Immutable release manifest convention and digest resolver — Ready for review
 
 Added the metadata half of the approved Model C deployment architecture

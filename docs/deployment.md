@@ -109,7 +109,59 @@ Security implications of the egress change:
 
 - Order: start `db` → wait `service_healthy` → run the one-shot `migrate` (`prisma migrate deploy`) to exit 0 → start `api`/`frontend` → activate the app-routing proxy → verify.
 - The migration job reuses the API image and exits 0 only on success; a non-zero exit aborts deployment.
-- **Application image rollback is not database rollback.** `deploy.sh rollback` re-selects the previous known-good digests and recreates `frontend`/`api`, but does **not** revert migrations. A destructive or incompatible migration requires a reviewed repair or restore path (backups are Section 8). Do not claim the database is automatically safe merely because images roll back.
+- **Application image rollback is not database rollback.** `deploy.sh rollback` restores an explicitly approved previous release and recreates only `frontend`/`api`; it does **not** revert migrations and never runs destructive database actions. A destructive or incompatible migration requires a reviewed repair or restore path (backups are Section 8). Do not claim the database is automatically safe merely because images roll back.
+
+## Manifest-driven release workflow (ARCH-004)
+
+Model C is implemented around the existing Compose stack. Nothing here contacts
+GitHub, adds SSH automation, or introduces a privileged agent.
+
+Operator flow:
+
+```text
+CI publishes build manifest  ->  human approves a release manifest
+  -> release manifest committed/staged in the infra repo
+  -> operator SSHes to the host
+  -> sudo ./deploy.sh release <release-id>
+       validate manifest -> stage images.env -> validate compose
+       -> pull images -> db healthy -> migrate (explicit) -> api/frontend
+       -> proxy/certbot -> health/smoke -> applied state -> evidence
+```
+
+- **Manifest resolution.** `release <release-id>` loads
+  `releases/<release-id>.json` (relative to the release dir; override with
+  `SOKOLADAS_MANIFEST_DIR`), validates `schemaVersion`, the release id,
+  `source.commit`, immutable `@sha256:` refs and the `linux/arm64` platform, then
+  deterministically generates the host-only `images.env`.
+- **Applied state (host-only, never committed).**
+  `/opt/sokoladas-staging/state/applied.json` records the actual applied release:
+  `releaseId`, `appliedAt`, `appliedBy`, source commit, exact web/API digest refs,
+  infra commit and `previousReleaseId`. It is written atomically **only after** a
+  successful deploy and health checks; a failed deployment is never marked
+  applied. History copies are kept under `state/history/`.
+- **Rollback.** `sudo ./deploy.sh rollback previous` restores the previous
+  successfully applied release; `sudo ./deploy.sh rollback <release-id>` restores
+  an explicit approved release. It recreates only `frontend`/`api`, never touches
+  the database or volumes, fails closed when no target is recorded, and warns
+  that the schema is not reverted.
+- **Health/smoke.** Non-destructive: `compose ps`, internal proxy/frontend/API
+  readiness, an only-the-proxy-publishes assertion, and public read-only checks
+  (apex `200`, `www` and HTTP redirects, ACME path, unauthenticated
+  `/api/auth/me` `401`). Public checks can be skipped in dry contexts with
+  `SOKOLADAS_SKIP_PUBLIC=1`. No data is created.
+- **Evidence (host-only, non-secret).**
+  `/opt/sokoladas-staging/evidence/<timestamp>-<release-id>/` retains the
+  manifest, generated `images.env`, compose/migration/health logs and a
+  `summary.txt` (`finalStatus: success|failure`). Failed deployments retain
+  evidence too. No secrets, cookies or tokens are captured.
+- **Failure behavior:** manifest/compose/preflight failures abort before any live
+  change; image-pull failure leaves the running release untouched; migration
+  failure aborts before starting the new application services; health failure
+  exits nonzero without writing applied state and prints the rollback command.
+
+`deploy.sh deploy` remains as a legacy direct deploy using the current
+`images.env` (no applied-state tracking); prefer `release`. Helper tests live in
+`scripts/tests/test_deploy_release.sh`.
 
 ## Verification status (D-002, 2026-09-15)
 
