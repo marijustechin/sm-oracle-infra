@@ -60,10 +60,31 @@ Secrets are root-managed files under `/etc/sokoladas-staging/secrets/` (outside 
 | `db_init_migration_password` | `db` (init only) | init-script copy of the migration password | postgres image UID, 0400 |
 | `jwt_access_secret` | `api` | staging access-token/OAuth-transaction signing material | app UID 10001, 0400 |
 | `smtp_password` | `api` | SMTP login password (`SMTP_PASSWORD_FILE`) | app UID 10001, 0400 |
+| `turnstile_secret_key` | `api` | Cloudflare Turnstile backend secret (`TURNSTILE_SECRET_KEY_FILE`) | app UID 10001, 0400 |
 | `staging_access` | `proxy` | htpasswd hash file for the invited-access gate | Nginx worker UID, 0400 |
 
 - The parent directory is `root:root 0700`. The `db_init_*` copies exist because PostgreSQL's init scripts run as the database OS user, not root; both copies must be kept synchronized during rotation.
 - No secret value is generated in this task; the model and ownership are recorded, not the material.
+
+## Turnstile configuration (public build-time + private host-only)
+
+Cloudflare Turnstile spans build-time and runtime configuration:
+
+- **Public site key (build-time).** `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is inlined
+  into the **web** image by the `smshop` `Images` workflow, which supplies it as a
+  Docker build argument from a GitHub Actions repository variable (never a
+  secret). Changing it requires rebuilding the web image. See
+  `smshop/docs/deployment.md`.
+- **Private secret (host-only, runtime).** The backend secret is the root-managed
+  file `/etc/sokoladas-staging/secrets/turnstile_secret_key` (owner app UID
+  `10001`, mode `0400`), mounted read-only and consumed by the `api` service as
+  `TURNSTILE_SECRET_KEY_FILE=/run/secrets/turnstile_secret_key`. It is never
+  rendered into an environment value, never committed, and never placed in
+  GitHub Actions.
+
+When the secret file is present and readable, the API enforces the challenge on
+the protected auth endpoints and fails closed; when it is absent the feature is
+disabled. The value is never logged or captured in evidence.
 
 ## SMTP enablement and API egress
 

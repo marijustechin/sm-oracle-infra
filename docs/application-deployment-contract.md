@@ -103,7 +103,7 @@ records the interface only; it does not invent secret values.
 | `JWT_ACCESS_SECRET_FILE` | api | signs access JWTs and derives the OAuth transaction key |
 | `SMTP_PASSWORD_FILE` | api | SMTP login password (staging secret file `smtp_password`) |
 | `GOOGLE_CLIENT_SECRET_FILE` | api | optional |
-| `TURNSTILE_SECRET_KEY_FILE` | api | optional |
+| `TURNSTILE_SECRET_KEY_FILE` | api | Cloudflare Turnstile backend secret (staging secret file `turnstile_secret_key`); optional, enables challenge enforcement when present |
 
 **Frontend (build-time, public, inlined by Next.js)**
 

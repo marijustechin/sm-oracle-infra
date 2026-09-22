@@ -2,6 +2,29 @@
 
 ## 2026-09-22
 
+### Turnstile secret wired into the staging API — Ready for review
+
+Minimal infrastructure wiring so the already-provisioned host secret is actually
+consumed by the API container (D-004 precondition; no deployment).
+
+- [`deploy/compose.yaml`](deploy/compose.yaml): the `api` service now receives
+  `TURNSTILE_SECRET_KEY_FILE=/run/secrets/turnstile_secret_key` and the
+  `turnstile_secret_key` secret; the top-level secret resolves to
+  `/etc/sokoladas-staging/secrets/turnstile_secret_key` (owner app UID 10001, mode
+  0400). The value is never rendered into an environment variable; DB/JWT/SMTP
+  wiring is unchanged.
+- Docs: [`docs/deployment.md`](docs/deployment.md) records the public build-time
+  site key vs the host-only secret, the mount, and ownership/mode;
+  [`docs/application-deployment-contract.md`](docs/application-deployment-contract.md)
+  names the staging secret file for `TURNSTILE_SECRET_KEY_FILE`.
+
+Verification: `docker compose config` (with safe dummy values + the example
+manifest) renders `TURNSTILE_SECRET_KEY_FILE=/run/secrets/turnstile_secret_key`,
+lists the secret under `api.secrets`, resolves the top-level secret to the host
+path, and shows only `proxy` publishing ports; `bash -n deploy/deploy.sh`;
+existing resolver/deploy tests pass. No host or OCI change. Ready for review, not
+Human accepted.
+
 ### Manifest-driven deployment hardening (ARCH-004) — Ready for review
 
 Extended [`deploy/deploy.sh`](deploy/deploy.sh) into a manifest-driven release
