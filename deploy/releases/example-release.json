@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "not-applied-example",
+  "createdAt": "2026-09-22T00:00:00Z",
+  "source": {
+    "repository": "github.com/marijustechin/smshop",
+    "commit": "070e68076c875c737e928d76703baf1b0d80bd9f",
+    "ref": "main"
+  },
+  "ci": {
+    "imagesRunId": "35754237865"
+  },
+  "images": {
+    "web": {
+      "ref": "ghcr.io/marijustechin/smshop-web@sha256:74e39c382a0d44cd5bee0ee17f454c2b9f0b9b63bb6bccf916ae508b3d57bf19",
+      "platform": "linux/arm64",
+      "tag": "sha-070e68076c875c737e928d76703baf1b0d80bd9f"
+    },
+    "api": {
+      "ref": "ghcr.io/marijustechin/smshop-api@sha256:e92294ad9c199f78030a170b476d2fc795fcbe6ace4de53049568da344dbe378",
+      "platform": "linux/arm64",
+      "tag": "sha-070e68076c875c737e928d76703baf1b0d80bd9f"
+    }
+  },
+  "infra": {
+    "contractCommit": "a7848fde4d274961479e845fd7333766c2c34316"
+  },
+  "notes": "Illustrative example only. Uses real published digests to document the schema; this release was NOT applied to staging."
+}

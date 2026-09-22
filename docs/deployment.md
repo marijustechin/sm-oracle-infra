@@ -9,6 +9,38 @@
 - Nginx and Certbot digests are pinned in `deploy/compose.yaml` (already verified `linux/arm64` in Section 6). PostgreSQL is pinned by digest in `deploy/compose.yaml` (`postgres@sha256:4ef4db…`); Prisma/ORM compatibility with PostgreSQL 18 was verified in D-001.
 - The application packages are public on GHCR, so no server-side registry credential is required; the host still needs docker/sudo to pull.
 
+## Release manifests and images.env generation
+
+Deployment metadata is prepared in three distinct layers — **desired** release,
+**applied** release, and deployment **evidence**. See
+[`deploy/releases/README.md`](../deploy/releases/README.md) for the schemas.
+
+- **Build manifest** — the `smshop` `Images` workflow emits a non-secret,
+  machine-readable `release-manifest` artifact describing what was built:
+  `schemaVersion`, `createdAt`, source repository/commit/ref, the images run id
+  and the immutable `@sha256:` web/API references. It carries no deployment
+  state, feature flags, configuration values or secrets.
+- **Approved staging release manifest** — the operator copies the build manifest
+  and adds a staging `releaseId`, the expected infra contract commit, and
+  optional notes, committing it as `deploy/releases/<release-id>.json`
+  (non-secret). `deploy/releases/example-release.json` is an illustrative,
+  never-applied example.
+- **Host applied state** — what actually ran on the host (planned `applied.json`
+  in ARCH-004); never committed.
+
+`images.env` is generated deterministically from the approved manifest and stays
+host-only/git-ignored:
+
+```sh
+python3 scripts/resolve_release_manifest.py deploy/releases/<release-id>.json --out images.env
+```
+
+The resolver accepts only immutable `@sha256:` references and writes exactly
+`WEB_IMAGE=…` and `API_IMAGE=…`. Mutable tags, malformed references, missing
+image entries and unexpected schema versions are rejected (tests:
+`scripts/tests/test_resolve_release_manifest.py`). This is metadata preparation
+only; it does not deploy and performs no network access.
+
 ## GHCR authentication (no credentials committed)
 
 - The server authenticates to GHCR with a **read-only** token scoped to `packages:read`, used only at pull time.

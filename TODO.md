@@ -21,6 +21,7 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 - [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments remain disabled (SMTP enablement is tracked above)
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
 - [ ] Create a deployment user/process if unattended deployment is ever wanted (currently human sudo only)
+- [ ] Deployment hardening (ARCH-004): manifest-driven `deploy.sh release`, host applied-release state (`applied.json`), explicit previous-release selection for rollback, richer health checks and retained deployment evidence. The preparatory release metadata (build manifest, approved release manifest, `images.env` resolver) is in place.
 
 **D-002 (first staging deployment) — DONE 2026-09-15 (Ready for review, not Human accepted).** Root task: `../tasks/done/D-002-first-oracle-staging-deployment.md`. Remaining items above are follow-ups, not deployment blockers.
 

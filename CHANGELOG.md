@@ -2,6 +2,35 @@
 
 ## 2026-09-22
 
+### Immutable release manifest convention and digest resolver — Ready for review
+
+Added the metadata half of the approved Model C deployment architecture
+(human-authorized, human-executed; no GitHub Actions SSH and no deploy
+credentials). No live change and no deployment.
+
+- `deploy/releases/README.md` documents three distinct layers: the **build
+  manifest** produced by the `smshop` `Images` workflow, the **approved staging
+  release manifest** committed here, and the host-only **applied state**. A
+  clearly illustrative `deploy/releases/example-release.json` documents the
+  schema (real published `070e680` digests; explicitly never applied).
+- `scripts/resolve_release_manifest.py` deterministically turns an approved
+  manifest into a host-only `images.env` containing exactly `WEB_IMAGE` and
+  `API_IMAGE`. It accepts only immutable `@sha256:` references and rejects
+  mutable tags, malformed registry references, missing entries and unsupported
+  schema versions; it performs no network access.
+- `scripts/tests/test_resolve_release_manifest.py` covers the valid path plus
+  mutable-tag, missing-digest, short-digest, malformed-ref, wrong-schema,
+  missing-image and malformed-JSON rejection (12 tests).
+- `docs/deployment.md` records the manifest/resolver convention.
+
+Verification: resolver unit tests pass (12/12); the resolver output was
+generated from the committed example; `docker compose config` still renders
+unchanged (only the proxy publishes `80`/`443`). No host or OCI change.
+
+Limitations: this prepares metadata only. `deploy.sh` is unchanged and does not
+yet consume a manifest; applied-state tracking and manifest-driven deploy are
+ARCH-004. Review status: Ready for review, not Human accepted. No push.
+
 ### Newer application image digests recorded (not deployed) — Ready for review
 
 Recorded the newer immutable `linux/arm64` application images published by the
