@@ -2,7 +2,30 @@
 
 ## 2026-09-22
 
-### D-004 staging deployment (updated auth + SMTP + Turnstile) — Ready for review
+### D-004 corrective release d004-v2 (Turnstile site-key fix) — Ready for review
+
+Live registration on `d004-v1` failed with Cloudflare Turnstile error `400020`
+(wrong public site key baked into the web image). Corrective immutable release
+`d004-v2` deployed via the manifest-driven flow. Source `smshop` `64cb8c6`;
+Images run `35764280629` attempt 3; infra `659a1cd`; manifest `348eac9`.
+
+- Images: web `ghcr.io/marijustechin/smshop-web@sha256:b6f3936f…`, api
+  `ghcr.io/marijustechin/smshop-api@sha256:b5ce59a6…` (both `linux/arm64`).
+  d004-v1's `506ea172…`/`25c14d80…` pair is superseded.
+- Applied state: `releaseId: d004-v2`, `previousReleaseId: d004-v1`; evidence
+  `evidence/20260922T200020Z-d004-v2/` `finalStatus: success`.
+- Migration: no pending migrations (schema unchanged).
+- Turnstile: corrected public site key `0x4AAAAAAEzCtUXC4APc3rZV` baked into the
+  served web bundle; the widget renders with no `400020`; API enforcement
+  confirmed.
+- SMTP/auth smoke (human, via Resend): register → verification email → verify →
+  login → logout → forgot password → reset email → reset → login with the new
+  password — all passed. Google not configured (`{"google":false}`).
+
+Invited-access gate unchanged (disabled). No OCI/DNS/firewall/TLS change; no
+database volume destruction. Ready for review, not Human accepted.
+
+### D-004 staging deployment (updated auth + SMTP + Turnstile) — superseded by d004-v2
 
 Deployed release `d004-v1` to `sokoladas-demo` via the manifest-driven flow
 (`sudo ./deploy.sh release d004-v1`), human-executed with interactive sudo.

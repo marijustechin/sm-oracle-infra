@@ -4,7 +4,23 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
-## D-004 staging deployment verified — 2026-09-22 — Ready for review
+## D-004 corrective release d004-v2 verified — 2026-09-22 — Ready for review
+
+Corrective release `d004-v2` deployed to `sokoladas-demo` with `sudo ./deploy.sh release d004-v2` (human interactive sudo). Source `smshop` `64cb8c6`; Images run `35764280629` attempt 3; infra `659a1cd`; manifest `348eac9`.
+
+- **Reason:** live registration on `d004-v1` showed Cloudflare Turnstile error `400020` (wrong public site key baked into the web image); corrected rebuild.
+- **Images (immutable):** web `ghcr.io/marijustechin/smshop-web@sha256:b6f3936f…`, api `ghcr.io/marijustechin/smshop-api@sha256:b5ce59a6…`; both `linux/arm64`.
+- **Applied state:** `releaseId: d004-v2`, `previousReleaseId: d004-v1`, `appliedBy: marijus`.
+- **Evidence:** `evidence/20260922T200020Z-d004-v2/` `finalStatus: success` (v1 evidence retained).
+- **Migration:** no pending migrations (schema unchanged; forward-only).
+- **Exposure:** only the proxy publishes `0.0.0.0:80`/`443`.
+- **HTTP/smoke:** apex `200`; HTTP→HTTPS `308`; www→apex `308`; `/health/ready` `200`; unauthenticated `/api/auth/me` `401`; ACME probe `404`.
+- **Turnstile:** corrected public site key `0x4AAAAAAEzCtUXC4APc3rZV` in the served web bundle; widget renders with no `400020`; API enforces the challenge.
+- **SMTP/auth:** Resend real-email/auth smoke passed by the operator (register → verify → login → logout → forgot/reset → login). Google not configured.
+
+No OCI/DNS/firewall/TLS change; no database volume destruction. Ready for review, not Human accepted.
+
+## D-004 staging deployment (d004-v1, superseded) — 2026-09-22
 
 Manifest-driven release `d004-v1` deployed to `sokoladas-demo` with `sudo ./deploy.sh release d004-v1` (human interactive sudo). Source `smshop` commit `64cb8c6`; Images run `35764280629` attempt 2; infra commit `7412851`.
 

@@ -1,6 +1,6 @@
 # Section 7 — Application deployment contract and image delivery
 
-**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-09-22: the manifest-driven D-004 release `d004-v1` is deployed and verified (see [server.md](server.md#d-004-staging-deployment-verified--2026-09-22--ready-for-review)).** No live change is authorized by this document itself.
+**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-09-22: the manifest-driven D-004 release is deployed and verified; the current applied release is the corrective `d004-v2` (see [server.md](server.md#d-004-corrective-release-d004-v2-verified--2026-09-22--ready-for-review)).** No live change is authorized by this document itself.
 
 ## Confirmed application runtime facts
 
@@ -53,9 +53,12 @@ published API image exited `0` against PostgreSQL 18; registration returned
 A pair of immutable `linux/arm64` images published by the application
 repository's `Images` workflow (run `35754237865`, source commit
 `070e68076c875c737e928d76703baf1b0d80bd9f`, CI run `35754237630` green) was
-**superseded before deployment**: the D-004 release deployed the later `64cb8c6`
-pair instead (run `35764280629` attempt 2; web `sha256:506ea172…`, api
-`sha256:25c14d80…`). These `070e680` digests were never applied to staging.
+**never applied** to staging. The D-004 line of releases used the later `64cb8c6`
+source instead:
+- run `35764280629` **attempt 2** (web `sha256:506ea172…`, api `sha256:25c14d80…`)
+  was applied as `d004-v1` and then superseded by the corrective `d004-v2`;
+- run `35764280629` **attempt 3** (web `sha256:b6f3936f…`, api `sha256:b5ce59a6…`)
+  is the current `d004-v2` release (corrected Turnstile public site key).
 
 | Image | Reference (immutable) | Platform |
 |---|---|---|
@@ -266,4 +269,4 @@ The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](
 - **Release ordering:** DB healthy → run the migration job to exit 0 → start API/frontend → verify the full request path through the proxy.
 - All services inherit the accepted Docker `local` log policy (10m × 3, compressed). No `container_name`, host network, privileged mode, Docker socket, or host PID namespace.
 
-**Infrastructure implementation status (D-002, 2026-09-15):** the `deploy/compose.yaml` env/secret wiring matches the reconciled interface — `api` receives `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with `DB_USER=sokoladas_migration` and `DB_PASSWORD_FILE`; `session_signing_key` was replaced by `jwt_access_secret`; `postgres` is pinned by digest; and `db/init` grants the migration role schema DDL and the runtime role DML only. The first staging deployment is **live and verified** (release `/opt/sokoladas-staging/releases/d002-v1`). **2026-09-22: the manifest-driven D-004 release `d004-v1` is deployed and verified** (source `64cb8c6`; web `sha256:506ea172…`, api `sha256:25c14d80…`; Turnstile secret wired via `TURNSTILE_SECRET_KEY_FILE`; SMTP/Resend configured); see [server.md](server.md#d-004-staging-deployment-verified--2026-09-22--ready-for-review).
+**Infrastructure implementation status (D-002, 2026-09-15):** the `deploy/compose.yaml` env/secret wiring matches the reconciled interface — `api` receives `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with `DB_USER=sokoladas_migration` and `DB_PASSWORD_FILE`; `session_signing_key` was replaced by `jwt_access_secret`; `postgres` is pinned by digest; and `db/init` grants the migration role schema DDL and the runtime role DML only. The first staging deployment is **live and verified** (release `/opt/sokoladas-staging/releases/d002-v1`). **2026-09-22: the manifest-driven D-004 releases are deployed and verified; the current applied release is the corrective `d004-v2`** (source `64cb8c6`; web `sha256:b6f3936f…`, api `sha256:b5ce59a6…`; `d004-v1` web `sha256:506ea172…`/api `sha256:25c14d80…` superseded; Turnstile secret wired via `TURNSTILE_SECRET_KEY_FILE`; SMTP/Resend configured); see [server.md](server.md#d-004-corrective-release-d004-v2-verified--2026-09-22--ready-for-review).

@@ -186,19 +186,24 @@ CI publishes build manifest  ->  human approves a release manifest
 
 ## D-004 verification status (2026-09-22)
 
-Release `d004-v1` deployed and verified (see [CHANGELOG](../CHANGELOG.md) and the
-[server inventory](server.md#d-004-staging-deployment-verified--2026-09-22--ready-for-review)):
+Corrective release **`d004-v2`** deployed and verified (see
+[CHANGELOG](../CHANGELOG.md) and the
+[server inventory](server.md#d-004-corrective-release-d004-v2-verified--2026-09-22--ready-for-review)).
+`d004-v1` was superseded by the Turnstile site-key fix.
 
-- Manifest-driven `deploy.sh release d004-v1`; `applied.json` records the release;
-  evidence `finalStatus: success`.
+- Manifest-driven `deploy.sh release d004-v2`; `applied.json` → `d004-v2`
+  (`previousReleaseId: d004-v1`); evidence `finalStatus: success`.
 - Migration reported no pending migrations (schema unchanged).
 - Only the proxy publishes `80/443`; frontend/API/PostgreSQL remain private.
 - Public: apex `200`, HTTP→HTTPS `308`, www→apex `308`, `/health/ready` `200`,
   unauthenticated `/api/auth/me` `401`, ACME probe `404`.
-- Turnstile enforced (host secret wired via `TURNSTILE_SECRET_KEY_FILE`); public
-  site key present in the deployed web bundle.
-- SMTP (Resend) host-only config staged; the real-email/auth smoke remains a human
-  manual check.
+- Turnstile renders with no `400020` (corrected public site key); API enforces the
+  challenge. SMTP (Resend) real-email/auth smoke passed (human).
+
+## D-004 verification status (d004-v1, superseded) (2026-09-22)
+
+`d004-v1` deployed 2026-09-22 but was superseded by the corrective `d004-v2`
+(Turnstile site-key fix). Its applied state and evidence remain recorded.
 
 ## Verification status (D-002, 2026-09-15)
 

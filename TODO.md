@@ -8,7 +8,7 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
-The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md). The application is **deployed and verified** — D-002 (2026-09-15) and the manifest-driven **D-004** release `d004-v1` (2026-09-22) — see [docs/server.md](docs/server.md#d-004-staging-deployment-verified--2026-09-22--ready-for-review).
+The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md). The application is **deployed and verified** — D-002 (2026-09-15) and the manifest-driven **D-004** corrective release `d004-v2` (2026-09-22) — see [docs/server.md](docs/server.md#d-004-corrective-release-d004-v2-verified--2026-09-22--ready-for-review).
 
 - [x] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests (contract C.1) and reconcile the exact environment/file-secret names, writable paths and DB connection layout — done 2026-09-15; digests recorded in the contract ("Published application images")
 - [x] Update `deploy/compose.yaml` to the reconciled interface: grant `jwt_access_secret` (replacing `session_signing_key`) as `JWT_ACCESS_SECRET_FILE`, and provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate` — done 2026-09-15; `postgres:18` pinned by digest; db init grants fixed and validated locally
@@ -17,7 +17,7 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 - [x] Provision the staging secrets (root-managed files under `/etc/sokoladas-staging/secrets/`) — done 2026-09-15 (values not recorded; ownership/mode verified). Recovery custody/rotation confirmation remains open
 - [x] Execute deployment (`deploy/deploy.sh deploy`) and verify frontend/API health through Nginx end-to-end — done 2026-09-15
 - [ ] Confirm secret recovery custody/rotation procedure
-- [x] Deploy staging transactional email (SMTP) — done 2026-09-22 (D-004, `d004-v1`): `api` receives `SMTP_*`/`MAIL_FROM` from host-only `deploy/smtp.env` (Resend), the `smtp_password` file secret (app UID 10001, 0400) mounted as `SMTP_PASSWORD_FILE`, and the outbound-only `egress` network (`app`/`db` internal, no published ports). End-to-end real-email smoke remains a manual human check (Turnstile + mailbox)
+- [x] Deploy staging transactional email (SMTP) — done 2026-09-22 (D-004, `d004-v2`): `api` receives `SMTP_*`/`MAIL_FROM` from host-only `deploy/smtp.env` (Resend), the `smtp_password` file secret (app UID 10001, 0400) mounted as `SMTP_PASSWORD_FILE`, and the outbound-only `egress` network (`app`/`db` internal, no published ports). End-to-end real-email/auth smoke verified (human)
 - [x] Enable Turnstile on staging — done 2026-09-22 (D-004): public site key baked into the web image at build time; host-only `turnstile_secret_key` wired into the API via `TURNSTILE_SECRET_KEY_FILE`; the API enforces the challenge (`403 TURNSTILE_REQUIRED` without a token)
 - [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments remain disabled
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
@@ -25,7 +25,7 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 
 **D-002 (first staging deployment) — DONE 2026-09-15 (Ready for review, not Human accepted).** Root task: `../tasks/done/D-002-first-oracle-staging-deployment.md`. Remaining items above are follow-ups, not deployment blockers.
 
-**D-004 (updated auth images + staging SMTP/Turnstile) — DEPLOYED 2026-09-22, release `d004-v1` (Ready for review, not Human accepted).** Root task: `../tasks/current/D-004-deploy-auth-images-and-staging-smtp.md`. Infrastructure/HTTP/Turnstile verification passed; the end-to-end real-email/auth smoke remains a human manual check.
+**D-004 (updated auth images + staging SMTP/Turnstile) — DONE 2026-09-22; current applied release `d004-v2` (corrective Turnstile site-key fix; `d004-v1` superseded) (Ready for review, not Human accepted).** Root task: `../tasks/done/D-004-deploy-auth-images-and-staging-smtp.md`. Infrastructure/HTTP/Turnstile verified; SMTP/auth smoke verified via Resend.
 
 ## 8. Backups
 
