@@ -2,6 +2,25 @@
 
 ## 2026-09-22
 
+### D-005 release d005-v1 deployed (Google OAuth enabled) — Ready for review
+
+Configuration-only release `d005-v1` deployed to `sokoladas-demo`, **reusing the
+d004-v2 application images** (no rebuild). Infra `2cfbe5c` (Google wiring);
+manifest `92052f1`; source `64cb8c6`.
+
+- Applied state: `releaseId: d005-v1`, `previousReleaseId: d004-v2`; evidence
+  `evidence/20260922T202401Z-d005-v1/` `finalStatus: success`.
+- Migration: no pending migrations (schema unchanged).
+- `/api/auth/capabilities` → `{"google":true}`; `GET /api/auth/google` → `302` to
+  Google with `redirect_uri=https://sokoladas.eu/api/auth/google/callback`.
+- Google OAuth smoke passed (fresh Google account; credentials-first convergence
+  with no duplicate `User`; Google-first + password reset resolving to the same
+  `User`); credentials/Turnstile/SMTP regression passed.
+- Only the proxy publishes `80/443`; invited-access gate unchanged (disabled).
+- No OCI/DNS/firewall/TLS change; no database volume destruction.
+
+Ready for review, not Human accepted.
+
 ### Google OAuth staging wiring (D-005) — Ready for review
 
 Wired the staging Google OAuth runtime configuration ahead of the `d005-v1`

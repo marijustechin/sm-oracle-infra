@@ -4,6 +4,18 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## D-005 Google OAuth enabled verified — 2026-09-22 — Ready for review
+
+Configuration-only release `d005-v1` deployed to `sokoladas-demo` with `sudo ./deploy.sh release d005-v1` (human interactive sudo), reusing the d004-v2 application images. Infra `2cfbe5c`; manifest `92052f1`; source `64cb8c6`.
+
+- **Applied state:** `releaseId: d005-v1`, `previousReleaseId: d004-v2`; evidence `evidence/20260922T202401Z-d005-v1/` `finalStatus: success`.
+- **Migration:** no pending migrations (schema unchanged).
+- **Google:** `GET /api/auth/capabilities` → `{"google":true}`; `GET /api/auth/google` → `302` to `accounts.google.com` with `redirect_uri=https://sokoladas.eu/api/auth/google/callback`. Host-only `google.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL`) and the `google_client_secret` file secret (`GOOGLE_CLIENT_SECRET_FILE`).
+- **Smoke:** fresh Google account; credentials-first convergence (no duplicate `User`); Google-first + password reset resolving to the same `User`; credentials/Turnstile/SMTP regression passed (human).
+- **Exposure:** only the proxy publishes `0.0.0.0:80`/`443`; frontend/API/PostgreSQL private.
+
+No OCI/DNS/firewall/TLS change; no database volume destruction. Ready for review, not Human accepted.
+
 ## D-004 corrective release d004-v2 verified — 2026-09-22 — Ready for review
 
 Corrective release `d004-v2` deployed to `sokoladas-demo` with `sudo ./deploy.sh release d004-v2` (human interactive sudo). Source `smshop` `64cb8c6`; Images run `35764280629` attempt 3; infra `659a1cd`; manifest `348eac9`.

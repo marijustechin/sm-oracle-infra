@@ -208,6 +208,20 @@ CI publishes build manifest  ->  human approves a release manifest
 `images.env` (no applied-state tracking); prefer `release`. Helper tests live in
 `scripts/tests/test_deploy_release.sh`.
 
+## D-005 verification status (2026-09-22)
+
+Configuration-only release **`d005-v1`** deployed and verified (see
+[CHANGELOG](../CHANGELOG.md) and the
+[server inventory](server.md#d-005-google-oauth-enabled-verified--2026-09-22--ready-for-review)).
+Reuses the d004-v2 application images (no rebuild).
+
+- `applied.json` → `d005-v1` (`previousReleaseId: d004-v2`); evidence
+  `finalStatus: success`; migration no pending.
+- `/api/auth/capabilities` → `{"google":true}`; the Google start endpoint 302s
+  with `redirect_uri=https://sokoladas.eu/api/auth/google/callback`.
+- Google OAuth smoke and credentials/Turnstile/SMTP regression passed (human).
+- Only the proxy publishes `80/443`.
+
 ## D-004 verification status (2026-09-22)
 
 Corrective release **`d004-v2`** deployed and verified (see
