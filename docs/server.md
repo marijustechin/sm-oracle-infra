@@ -4,6 +4,21 @@
 
 This is the authoritative recorded inventory, not guaranteed live state. The historical OCI baseline below was consolidated from existing repository documentation on 2026-09-07 without external inspection. A subsequent authorized read-only SSH inspection on the same date established the separate live observations below. Original historical observation dates remain unknown unless stated. Live observations are point-in-time evidence, not configuration guarantees.
 
+## D-004 staging deployment verified — 2026-09-22 — Ready for review
+
+Manifest-driven release `d004-v1` deployed to `sokoladas-demo` with `sudo ./deploy.sh release d004-v1` (human interactive sudo). Source `smshop` commit `64cb8c6`; Images run `35764280629` attempt 2; infra commit `7412851`.
+
+- **Images (immutable):** web `ghcr.io/marijustechin/smshop-web@sha256:506ea172…`, api `ghcr.io/marijustechin/smshop-api@sha256:25c14d80…`; both `linux/arm64`.
+- **Applied state:** `/opt/sokoladas-staging/state/applied.json` → `releaseId: d004-v1`, `previousReleaseId: null`, `appliedBy: marijus`.
+- **Evidence:** `/opt/sokoladas-staging/evidence/20260922T192608Z-d004-v1/` `finalStatus: success`.
+- **Migration:** `prisma migrate deploy` → "No pending migrations to apply" (schema unchanged; forward-only).
+- **Exposure:** only the proxy publishes `0.0.0.0:80`/`443`; `3000`/`3001`/`5432` remain unpublished.
+- **HTTP/smoke:** apex `200`; HTTP→HTTPS `308`; www→apex `308`; `/health/ready` `200`; unauthenticated `/api/auth/me` `401`; ACME probe `404`.
+- **Turnstile:** host secret wired via `TURNSTILE_SECRET_KEY_FILE`; the API enforces the challenge (unauthenticated register → `403 TURNSTILE_REQUIRED`); the public site key is present in the deployed web bundle.
+- **SMTP:** host-only Resend `smtp.env` staged (`smtp.resend.com:465`, user `resend`); `smtp_password` mounted as `SMTP_PASSWORD_FILE`. Google not configured (`capabilities` → `{"google":false}`).
+
+Not performed here: the end-to-end real-email/auth smoke (Turnstile + mailbox; human manual check). No OCI/DNS/firewall/TLS change; no database volume destruction. Ready for review, not Human accepted.
+
 ## D-002 first staging deployment verified — 2026-09-15 — Ready for review
 
 The first application deployment to `sokoladas-demo` is live and verified behind the existing Nginx/TLS edge. Release `/opt/sokoladas-staging/releases/d002-v1`; Compose project `sokoladas-staging`; containers `proxy`, `certbot`, `api`, `frontend`, `db` all healthy.

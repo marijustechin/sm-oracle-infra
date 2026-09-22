@@ -2,6 +2,36 @@
 
 ## 2026-09-22
 
+### D-004 staging deployment (updated auth + SMTP + Turnstile) — Ready for review
+
+Deployed release `d004-v1` to `sokoladas-demo` via the manifest-driven flow
+(`sudo ./deploy.sh release d004-v1`), human-executed with interactive sudo.
+Source `smshop` commit `64cb8c6`; Images run `35764280629` attempt 2; infra
+commit `7412851` (Turnstile secret wiring).
+
+- Images: web `ghcr.io/marijustechin/smshop-web@sha256:506ea172…`, api
+  `ghcr.io/marijustechin/smshop-api@sha256:25c14d80…` (both `linux/arm64`).
+- Applied state `state/applied.json` → `releaseId: d004-v1`
+  (`previousReleaseId: null`); evidence `evidence/20260922T192608Z-d004-v1/`
+  `finalStatus: success`.
+- Migration: `prisma migrate deploy` → "No pending migrations to apply" (schema
+  unchanged; forward-only).
+- Health/smoke: all containers healthy; only proxy publishes 80/443; apex `200`;
+  HTTP→HTTPS `308`; www→apex `308`; `/health/ready` `200`; unauthenticated
+  `/api/auth/me` `401`; ACME probe `404`.
+- Turnstile enforced: host secret wired via `TURNSTILE_SECRET_KEY_FILE`; the
+  public site key is present in the deployed web bundle; unauthenticated
+  register → `403 TURNSTILE_REQUIRED`. Google is not configured
+  (`capabilities` → `{"google":false}`).
+- SMTP: host-only Resend `smtp.env` staged; `smtp_password` mounted
+  (`SMTP_PASSWORD_FILE`).
+
+Limitations: the end-to-end real-email/auth smoke (register → verification email
+→ verify → login/reset via Resend) requires a real Turnstile challenge and
+mailbox access and was not automated — it remains a human manual check. The
+invited-access gate is left disabled (unchanged). No OCI/DNS/firewall/TLS
+change; no database volume destruction. Ready for review, not Human accepted.
+
 ### Turnstile secret wired into the staging API — Ready for review
 
 Minimal infrastructure wiring so the already-provisioned host secret is actually

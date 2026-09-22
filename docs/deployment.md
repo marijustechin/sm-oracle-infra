@@ -184,6 +184,22 @@ CI publishes build manifest  ->  human approves a release manifest
 `images.env` (no applied-state tracking); prefer `release`. Helper tests live in
 `scripts/tests/test_deploy_release.sh`.
 
+## D-004 verification status (2026-09-22)
+
+Release `d004-v1` deployed and verified (see [CHANGELOG](../CHANGELOG.md) and the
+[server inventory](server.md#d-004-staging-deployment-verified--2026-09-22--ready-for-review)):
+
+- Manifest-driven `deploy.sh release d004-v1`; `applied.json` records the release;
+  evidence `finalStatus: success`.
+- Migration reported no pending migrations (schema unchanged).
+- Only the proxy publishes `80/443`; frontend/API/PostgreSQL remain private.
+- Public: apex `200`, HTTP→HTTPS `308`, www→apex `308`, `/health/ready` `200`,
+  unauthenticated `/api/auth/me` `401`, ACME probe `404`.
+- Turnstile enforced (host secret wired via `TURNSTILE_SECRET_KEY_FILE`); public
+  site key present in the deployed web bundle.
+- SMTP (Resend) host-only config staged; the real-email/auth smoke remains a human
+  manual check.
+
 ## Verification status (D-002, 2026-09-15)
 
 Verified live on `sokoladas-demo`:
