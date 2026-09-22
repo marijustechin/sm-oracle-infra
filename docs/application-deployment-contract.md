@@ -238,7 +238,7 @@ here.
 
 ## Compose contract skeleton (proposed — not implemented)
 
-The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](../deploy/compose.yaml) (review only; image references are supplied externally via `images.env` and not yet available). The abstract contract:
+The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](../deploy/compose.yaml) (image references are supplied externally via `images.env` as immutable `@sha256:` digests). The abstract contract:
 
 | Service | Image | Networks | Published ports | Mounts / secrets | Lifecycle / ordering |
 |---|---|---|---|---|---|

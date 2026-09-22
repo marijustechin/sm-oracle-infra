@@ -120,7 +120,7 @@ Use **root-managed files outside every Git checkout, mounted only into consuming
 | `db_admin_password` | db only | PostgreSQL bootstrap administrator; never give to API or migration job |
 | `db_app_password` | db for initial role creation; api | Dedicated login with only required application schema/data privileges; no superuser, role creation or DB creation |
 | `db_migration_password` | db for initial role creation; migrate | Separate schema-owner/migration role limited to staging DB; not a PostgreSQL superuser; API should not routinely perform DDL |
-| `session_signing_key` | api | Staging-only signing/session material; frontend forwards authenticated requests, not this secret |
+| `jwt_access_secret` | api | Staging-only signing/session material (`JWT_ACCESS_SECRET_FILE`); renamed from `session_signing_key` on 2026-09-15; frontend forwards authenticated requests, not this secret |
 | `staging_access` | proxy | Nginx htpasswd-format file containing password hashes for the proposed staging access gate; plaintext password held by owner |
 | Sandbox payment/webhook keys (conditional) | api | Add only for explicitly selected sandbox integration; no live-mode credentials |
 

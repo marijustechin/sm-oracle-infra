@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Section 7 deployment / rollback — review skeleton.
+# Section 7 deployment / rollback.
 #
-# Not yet exercised against real application images. Run as the human
-# administrator with sudo. Image references come from images.env and must be
-# immutable `@sha256:` digests; mutable tags are refused.
+# Exercised against real application images (D-002, 2026-09-15). Run as the
+# human administrator with sudo. Image references come from images.env and must
+# be immutable `@sha256:` digests; mutable tags are refused.
 set -euo pipefail
 
 RELEASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
