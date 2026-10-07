@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "d006-v1",
+  "createdAt": "2026-10-07T18:55:00Z",
+  "source": {
+    "repository": "github.com/marijustechin/smshop",
+    "commit": "9069715159da09d64ca3831d46da388d6a8d8ec2",
+    "ref": "main"
+  },
+  "ci": {
+    "imagesRunId": "37669495907"
+  },
+  "images": {
+    "web": {
+      "ref": "ghcr.io/marijustechin/smshop-web@sha256:5e68f161f2610cfd1d22889b96ab991811e5e73121276c9a8e06c7ae8c74d1b6",
+      "platform": "linux/arm64",
+      "tag": "sha-9069715159da09d64ca3831d46da388d6a8d8ec2"
+    },
+    "api": {
+      "ref": "ghcr.io/marijustechin/smshop-api@sha256:8699cf87ac472ec569c96c6db261b76aee19eade35f60699bf677019753f817d",
+      "platform": "linux/arm64",
+      "tag": "sha-9069715159da09d64ca3831d46da388d6a8d8ec2"
+    }
+  },
+  "infra": {
+    "contractCommit": "c0600df1733679b5da43f596045e9968dd40fd8f"
+  },
+  "notes": "Publish the catalogue: catalogue/shop products, media library, public /tortai with tags and verified legacy ratings, catalogue description limit; web image now ships apps/web/public. Infra adds persistent media storage and the API /media route. Source 9069715, Images run 37669495907; web image includes public assets."
+}
