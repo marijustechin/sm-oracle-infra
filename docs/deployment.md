@@ -150,6 +150,28 @@ Security implications of the egress change:
 - The first-boot script creates the application (`sokoladas_app`, runtime) and migration (`sokoladas_migration`, schema owner) roles. It grants the migration role `CREATE, USAGE` on schema `public` and the runtime role `USAGE` only, with default privileges so future migration-created tables/sequences are usable by the runtime role. **Schema creation and grants are owned by the application migration** (`prisma migrate deploy`). This grants gap (PostgreSQL 15+ no longer gives `PUBLIC` CREATE on `public`) was fixed and validated locally against PostgreSQL 18 in D-002 preparation.
 - **Prisma/ORM compatibility with PostgreSQL 18 was verified in D-001** (migration and readiness against a disposable PostgreSQL 18); reconfirm during first real initialization.
 
+## Persistent product media (D-006)
+
+Uploaded product images are stored on a persistent named volume so they survive
+container replacement and redeploys.
+
+- `media_data` (`sokoladas-staging_media_data`) is mounted at
+  `/var/lib/sokoladas-media` on the `api` service, with
+  `MEDIA_STORAGE_DIR=/var/lib/sokoladas-media`. The API writes normalized WebP
+  files under `products/` and serves them at the app-relative
+  `/media/products/<uuid>.webp` path stored on catalogue products.
+- Docker creates named volumes root-owned, but the API runs as UID 10001. A
+  one-shot `media-init` service (root, profile `tools`) creates
+  `<MEDIA_STORAGE_DIR>/products` and chowns it to `10001:10001`. `deploy.sh
+  release` runs it after migrations and before starting `api`/`frontend`.
+- `location /media/` in the proxy is routed to the API upstream; only the proxy
+  still publishes `80/443`.
+- The volume is not touched by `rollback` (which recreates only `frontend`/`api`)
+  or by any destructive command; `deploy.sh` contains no volume-deletion command.
+- Catalogue content is imported after deployment with
+  [`deploy/catalog-import/`](catalog-import/README.md) (idempotent, slug-keyed);
+  media files are copied into the volume with UID 10001 ownership.
+
 ## Migration ordering and rollback limitations
 
 - Order: start `db` → wait `service_healthy` → run the one-shot `migrate` (`prisma migrate deploy`) to exit 0 → start `api`/`frontend` → activate the app-routing proxy → verify.
@@ -207,6 +229,30 @@ CI publishes build manifest  ->  human approves a release manifest
 `deploy.sh deploy` remains as a legacy direct deploy using the current
 `images.env` (no applied-state tracking); prefer `release`. Helper tests live in
 `scripts/tests/test_deploy_release.sh`.
+
+## D-006 verification status (2026-10-07)
+
+Release **`d006-v1`** deployed and verified (see [CHANGELOG](../CHANGELOG.md)).
+Source `9069715`; Images run `37669495907`; web `sha256:5e68f161…`, api
+`sha256:8699cf87…` (`linux/arm64`).
+
+- `applied.json` → `d006-v1` (`previousReleaseId: d005-v1`); evidence
+  `finalStatus: success`.
+- Migrations applied: `add_user_roles`, `add_product_catalogue_and_shop`,
+  `add_catalogue_tags_and_legacy_ratings`.
+- Persistent `media_data` volume created; `media-init` chowned it; nginx
+  `/media/` route live.
+- Catalogue import: 5 products, `tortai` category, 9 tags, verified legacy
+  ratings; 5 images in the volume.
+- Public: homepage/branding `200`; `/tortai` + 5 detail pages `200`; public API
+  shows tags/ratings and no commercial fields; `/media/products/…` `200
+  image/webp`; deletes/redirects/`X-Robots-Tag` and invited-access gate
+  unchanged; only the proxy publishes `80/443`.
+- Admin: authorized access (temporary signed token), image upload and public
+  serving verified, then the test upload and temporary admin were removed.
+- Limitations: Always Free eligibility not verifiable (no OCI account access);
+  interactive login not exercised (Turnstile enforced, no browser);
+  pixel-level responsive screenshots not captured (no browser).
 
 ## D-005 verification status (2026-09-22)
 

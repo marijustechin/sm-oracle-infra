@@ -1085,6 +1085,57 @@ The [September 6 change log](../CHANGELOG.md) reports completed package updates/
 
 The listed verification commands were `whoami` and `sudo whoami`, without captured outputs. These address identity and sudo behavior; they do not establish SSH authentication method or effective SSH policy. Key login success would not by itself establish key-only access. No fresh access verification occurred during documentation remediation.
 
+## D-006 catalogue release with persistent media — verified 2026-10-07 — Ready for review
+
+Manifest-driven release `d006-v1` deployed to `sokoladas-demo` by the dedicated
+`deploy` host user (created for this release; non-interactive sudo + docker).
+Source `smshop` `9069715`; Images run `37669495907`; infra wiring `c0600df`;
+manifest `a63eefe`. Previous release `d005-v1`.
+
+- Images: web `ghcr.io/marijustechin/smshop-web@sha256:5e68f161…`, api
+  `ghcr.io/marijustechin/smshop-api@sha256:8699cf87…` (both `linux/arm64`).
+- Applied state `d006-v1`, `previousReleaseId: d005-v1`; evidence
+  `/opt/sokoladas-staging/evidence/20261007T185735Z-d006-v1/` `finalStatus:
+  success`; the release dir `/opt/sokoladas-staging/releases/d006-v1` was staged
+  root-owned and the host-only `smtp.env`/`google.env` preserved.
+- Schema: migrations `20260923153611_add_user_roles`,
+  `20260924180329_add_product_catalogue_and_shop`,
+  `20260924200000_catalogue_tags_and_legacy_ratings` applied. Previously only
+  `20260913164639_add_authentication_domain` was applied. Existing users (4)
+  preserved; the server database was never replaced with the development copy.
+- Persistent media: named volume `sokoladas-staging_media_data` mounted at
+  `/var/lib/sokoladas-media` (`MEDIA_STORAGE_DIR`); `media-init` chowned
+  `products/` to UID 10001; nginx `location /media/` → API upstream.
+- Catalogue import (`deploy/catalog-import/`, idempotent, slug-keyed): 5 products,
+  the `tortai` CATALOG category, 9 tags and the verified legacy ratings; 5
+  referenced WebP files copied into the volume with UID 10001 ownership.
+  `tortas-violeta` (2592 chars) preserved verbatim (over the 1000-char editorial
+  limit).
+- Backup before changes: `pg_dump -Fc` (custom) retrieved to the development
+  machine (`backups/sokoladas_staging_20261007T184939Z.dump`); SHA-256 verified
+  and `pg_restore --list` reads 46 TOC entries. No pre-existing uploaded media
+  existed to copy. (No configured off-host backup destination exists.)
+- Directly observed live checks: homepage and branding assets (`/branding/*`) and
+  favicon `200`; `/tortai` and all five `/tortai/<slug>` `200`; public catalogue
+  API returns the 5 products with tags and ratings and no commercial fields;
+  `/media/products/<uuid>.webp` `200 image/webp` (immutable cache, routed via the
+  new proxy location); authorized admin access via a temporary HS256 access token
+  listed 5 products/9 tags and uploaded a temporary image that was publicly
+  served; media survived `--force-recreate api`; HTTP→HTTPS and www→apex `308`;
+  `X-Robots-Tag: noindex` and the disabled invited-access gate unchanged; only the
+  proxy publishes `80/443`. The temporary upload and temporary admin user were
+  removed (volume back to 5 files, users back to 4).
+- Limitations: OCI Always Free eligibility could not be verified (no OCI
+  account/Console/CLI access from the agent). A full interactive login was not
+  exercised — Turnstile is enforced and no browser is available; the login
+  endpoint returns `403 TURNSTILE_REQUIRED` without a challenge token. Pixel-level
+  responsive screenshots were not captured (no browser); layout is verified by
+  component tests and the served Tailwind utilities (`max-w-7xl`,
+  `lg:grid-cols-2`). Temporary 1×1 grayscale+alpha PNG uploads are rejected
+  (`INVALID_IMAGE`); normal photo inputs are unaffected.
+- Rollback boundary: `sudo ./deploy.sh rollback previous` restores `d005-v1`
+  images only; migrations are forward-only and the media volume is untouched.
+
 ## Current unknowns and prerequisites
 
 | Area | Recorded limitation / prerequisite |
@@ -1095,7 +1146,7 @@ The listed verification commands were `whoami` and `sudo whoami`, without captur
 | Host / containers | Listeners, firewall technology, and saved rules recorded in the network assessment above; loaded filter rules were subsequently supplied by Marijus, with the UDP 123 live-rule representations subsequently verified consistent by the owner. Earlier saved-file evidence remains historical; no fresh persistence comparison is claimed. September 8 Docker installation above establishes the rootful runtime, default data roots, bounded local logging and unchanged LXD installer. Docker added its runtime forwarding/NAT chains; saved firewall files remain unchanged. Container publishing and reboot/reload behavior were subsequently verified during Section 6 (TCP 80/443 publication, DNAT/FORWARD, and reboot persistence); the future application/database port-privacy check remains a Section 7 item |
 | DNS / TLS / application | DNS/TLS uninspected; no application workload identified in the point-in-time views above, not an exhaustive deployment audit |
 | Secrets | No storage/delivery mechanism selected; never put secret values in this inventory or verification output |
-| Persistent data | OS/account state and package metadata backups observed; application data not identified in inspected paths. Owner confirms no pre-existing application/user data needs preservation; protected paths remain uninspected. Future application-data backup policy/restore capability remain open |
+| Persistent data | OS/account state and package metadata backups observed. As of D-006 (2026-10-07) the staging database and uploaded product media are data worth keeping: `pg_dump -Fc` backups are taken to the development machine before migrations (no configured off-host destination exists yet), and `sokoladas-staging_media_data` holds product images. A recurring backup schedule/retention and a restore test remain open. Never put secret values in this inventory or verification output |
 
 Before access-breaking changes, establish and record an available recovery path, relevant current access/fallback methods, and success checks; explicit human approval is required. Verify relevant OCI rules, host firewall behavior, and container-published ports together before claiming private service exposure. These prerequisites do not authorize inspection or changes themselves.
 

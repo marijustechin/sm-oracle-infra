@@ -1,6 +1,6 @@
 # Section 7 — Application deployment contract and image delivery
 
-**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-09-22: D-004 and the configuration-only D-005 are deployed and verified; the current applied release is `d005-v1` (Google OAuth enabled; see [server.md](server.md#d-005-google-oauth-enabled-verified--2026-09-22--ready-for-review)).** No live change is authorized by this document itself.
+**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-09-22: D-004 and the configuration-only D-005 are deployed and verified; the current applied release is `d006-v1` (catalogue + persistent media; see [deployment.md](deployment.md#d-006-verification-status-2026-10-07)).** No live change is authorized by this document itself.
 
 ## Confirmed application runtime facts
 
@@ -213,7 +213,10 @@ These values are supplied by the application project and are not invented by inf
    internal); the dedicated, outbound-only `egress` network is **prepared in
    `deploy/compose.yaml`** (only `api` attached; no ports published). No other
    egress is required today. See "Staging SMTP enablement" below.
-7. Persistent storage beyond PostgreSQL (e.g. uploads) — none required now; revisit only if uploads are approved.
+7. Persistent storage beyond PostgreSQL (product media) — **resolved
+   2026-10-07**: the product-image library requires persistence; implemented as
+   the `media_data` volume mounted at `/var/lib/sokoladas-media` with
+   `MEDIA_STORAGE_DIR` and a one-shot `media-init` ownership step (D-006).
 8. Additional secrets beyond `JWT_ACCESS_SECRET` / DB credentials — the SMTP
    password is the next concrete secret (see below); sandbox payment or other
    provider keys remain undefined.

@@ -8,7 +8,7 @@ Necessary manual server changes must be documented, with reproducible scripts/co
 
 ## 7. Deployment
 
-The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md). The application is **deployed and verified** — D-002 (2026-09-15) and the manifest-driven **D-004** corrective release `d004-v2` (2026-09-22) — see [docs/server.md](docs/server.md#d-004-corrective-release-d004-v2-verified--2026-09-22--ready-for-review).
+The [application deployment contract](docs/application-deployment-contract.md) is reconciled against the application's confirmed runtime facts (ports 3000/3001, `/health/ready`, UID 10001, stateless + graceful SIGTERM, `prisma migrate deploy`, PostgreSQL 18). The infra-side foundation is in [deploy/](deploy/) and [docs/deployment.md](docs/deployment.md). The application is **deployed and verified** — D-002 (2026-09-15), the manifest-driven **D-004** corrective release `d004-v2` (2026-09-22) and the **D-006** catalogue + persistent-media release `d006-v1` (2026-10-07) — see [docs/server.md](docs/server.md#d-006-catalogue-release-with-persistent-media--verified-2026-10-07--ready-for-review).
 
 - [x] Obtain real `WEB_IMAGE`/`API_IMAGE` GHCR digests (contract C.1) and reconcile the exact environment/file-secret names, writable paths and DB connection layout — done 2026-09-15; digests recorded in the contract ("Published application images")
 - [x] Update `deploy/compose.yaml` to the reconciled interface: grant `jwt_access_secret` (replacing `session_signing_key`) as `JWT_ACCESS_SECRET_FILE`, and provide `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER` plus `DB_PASSWORD_FILE` to both `api` and `migrate` — done 2026-09-15; `postgres:18` pinned by digest; db init grants fixed and validated locally
@@ -21,11 +21,14 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 - [x] Enable Turnstile on staging — done 2026-09-22 (D-004): public site key baked into the web image at build time; host-only `turnstile_secret_key` wired into the API via `TURNSTILE_SECRET_KEY_FILE`; the API enforces the challenge (`403 TURNSTILE_REQUIRED` without a token)
 - [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments remain disabled
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
-- [ ] Create a deployment user/process if unattended deployment is ever wanted (currently human sudo only)
+- [x] Create a deployment user/process if unattended deployment is ever wanted — done 2026-10-07: dedicated `deploy` host user with non-interactive sudo + docker, used for the `d006-v1` release (unattended deployment remains a human decision per release)
+- [ ] Harden/scope the `deploy` user's sudo rights if unattended deployment is retained (currently `NOPASSWD:ALL`)
 
 **D-002 (first staging deployment) — DONE 2026-09-15 (Ready for review, not Human accepted).** Root task: `../tasks/done/D-002-first-oracle-staging-deployment.md`. Remaining items above are follow-ups, not deployment blockers.
 
-**D-004 (updated auth images + staging SMTP/Turnstile) — DONE 2026-09-22; current applied release `d004-v2` (corrective Turnstile site-key fix; `d004-v1` superseded) (Ready for review, not Human accepted).** Root task: `../tasks/done/D-004-deploy-auth-images-and-staging-smtp.md`. Infrastructure/HTTP/Turnstile verified; SMTP/auth smoke verified via Resend.
+**D-004 (updated auth images + staging SMTP/Turnstile) — DONE 2026-09-22; release `d004-v2` (corrective Turnstile site-key fix; `d004-v1` superseded) (Ready for review, not Human accepted).** Root task: `../tasks/done/D-004-deploy-auth-images-and-staging-smtp.md`. Infrastructure/HTTP/Turnstile verified; SMTP/auth smoke verified via Resend.
+
+**D-006 (catalogue + persistent media) — DONE 2026-10-07; current applied release `d006-v1` (Ready for review, not Human accepted).** Root task: `../tasks/done/ORACLE-RELEASE.md`. Added the persistent `media_data` volume + `MEDIA_STORAGE_DIR`/`media-init`, the nginx `/media/` route, and the explicit slug-keyed catalogue import. Migrations applied; 5 catalogue products + images imported; live checks passed (see `docs/server.md`). Pre-deploy DB backup retrieved to the development machine.
 
 ## 8. Backups
 
@@ -34,7 +37,7 @@ Resolve applicable backup needs before introducing valuable persistent data. Dem
 - [ ] Decide which data can be recreated and which must be backed up
 - [ ] Choose backup destination and cadence
 - [ ] Define PostgreSQL backup strategy
-- [ ] Define media/uploads backup strategy
+- [ ] Define media/uploads backup strategy — progress 2026-10-07 (D-006): product media now persists in `sokoladas-staging_media_data`; a pre-deploy `pg_dump -Fc` was retrieved to the development machine. No off-host destination, cadence or media-backup schedule exists yet
 - [ ] Store backups outside Oracle VM
 - [ ] Define retention policy
 - [ ] Test restore procedure

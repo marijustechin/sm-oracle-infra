@@ -1,5 +1,82 @@
 # Infrastructure Change Log
 
+## 2026-10-07
+
+### D-006 release d006-v1 deployed (catalogue + persistent media) — Ready for review
+
+Manifest-driven release `d006-v1` deployed to `sokoladas-demo`, publishing the
+current application catalogue. Source `smshop` `9069715`; Images run
+`37669495907` (attempt 1, green); infra wiring `c0600df`; manifest `a63eefe`.
+
+- Images: web `ghcr.io/marijustechin/smshop-web@sha256:5e68f161…`, api
+  `ghcr.io/marijustechin/smshop-api@sha256:8699cf87…` (both `linux/arm64`).
+  Previous release `d005-v1`.
+- Applied state: `releaseId: d006-v1`, `previousReleaseId: d005-v1`; evidence
+  `evidence/20261007T185735Z-d006-v1/` `finalStatus: success`.
+- Migrations applied: `20260923153611_add_user_roles`,
+  `20260924180329_add_product_catalogue_and_shop`,
+  `20260924200000_catalogue_tags_and_legacy_ratings` (previously only the auth
+  migration was applied).
+- Persistent product media: new `media_data` volume
+  (`sokoladas-staging_media_data`) mounted at `/var/lib/sokoladas-media` with
+  `MEDIA_STORAGE_DIR`; a one-shot `media-init` service creates and chowns
+  `products/` to UID 10001 before the API starts; nginx routes `/media/` to the
+  API upstream.
+- Catalogue import (`deploy/catalog-import/`): 5 products + the `tortai`
+  category + 9 tags + verified legacy ratings; the 5 referenced `.webp` images
+  were placed in the media volume. `tortas-violeta` (2592 chars) is imported
+  verbatim, over the 1000-char catalogue editorial limit; it must be shortened
+  by the employee before its next admin save.
+- Web image now ships `apps/web/public`, so branding assets and the favicon
+  return `200` (previously missing from the runtime image).
+- Pre-deploy database backup retrieved to the development machine
+  (`backups/sokoladas_staging_20261007T184939Z.dump`; SHA-256 verified;
+  `pg_restore --list` reads 46 TOC entries). No pre-existing uploaded media
+  existed. The server database was never replaced with the development database.
+- Live verification: homepage + branding `200`; `/tortai` and all five detail
+  pages `200`; public API returns tags and ratings with no commercial fields;
+  `/media/products/…` serves `200 image/webp` with immutable caching; authorized
+  admin access (temporary HS256 access token) listed 5 products/9 tags and
+  uploaded a temporary image that was publicly served, then the upload and the
+  temporary admin were removed; media survived `--force-recreate api`; HTTP→HTTPS
+  and www→apex `308`; `X-Robots-Tag: noindex` and the disabled invited-access
+  gate unchanged; only the proxy publishes `80/443`.
+- Limitations: OCI Always Free eligibility could **not** be verified (no OCI
+  account/Console/CLI access available to the agent; instance shape is not
+  evidence). A full interactive login was not exercised — Turnstile is enforced
+  and there is no browser; the login endpoint returns `403 TURNSTILE_REQUIRED`
+  without a challenge token. Pixel-level responsive screenshots were not
+  captured (no browser); layout is verified by component tests plus the served
+  Tailwind utilities (`max-w-7xl`, `lg:grid-cols-2`).
+- Deferred: single 1×1 grayscale+alpha PNGs are rejected as `INVALID_IMAGE`
+  (normal photo inputs are unaffected).
+
+Ready for review, not Human accepted.
+
+### Persistent product media and catalogue import (infra wiring) — Ready for review
+
+Prepared the staging infrastructure for the catalogue release.
+
+- [`deploy/compose.yaml`](deploy/compose.yaml): `media_data` named volume and
+  `MEDIA_STORAGE_DIR=/var/lib/sokoladas-media` for `api`; a `media-init` one-shot
+  service (root, profile `tools`) that creates and chowns
+  `<MEDIA_STORAGE_DIR>/products` to UID 10001. No other service changes, no new
+  published ports.
+- [`deploy/deploy.sh`](deploy/deploy.sh): runs `media-init` after migrations and
+  before the app services in `release` (and in the legacy `deploy`).
+- [`deploy/proxy/nginx.conf`](deploy/proxy/nginx.conf): `location /media/` proxies
+  to the API upstream (uploaded media is API-served; the frontend does not own
+  it).
+- [`deploy/catalog-import/`](deploy/catalog-import/README.md): explicit,
+  idempotent, slug-keyed importer (`import-catalog.mjs`), data (`catalog.json`)
+  and a host wrapper (`run-import.sh`).
+
+Verification: `bash -n deploy.sh`; `docker compose config`; deploy helper tests
+(`test_deploy_release.sh` 32, `test_deploy_google.sh` 14,
+`test_resolve_release_manifest.py` 14) pass. No host change in this step.
+
+Ready for review, not Human accepted.
+
 ## 2026-09-22
 
 ### D-005 release d005-v1 deployed (Google OAuth enabled) — Ready for review

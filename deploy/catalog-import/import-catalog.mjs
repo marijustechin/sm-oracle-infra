@@ -16,7 +16,27 @@
 // See README.md for the exact host invocation.
 
 import { readFile } from 'node:fs/promises';
-import { PrismaClient, ProductScope, ProductStatus } from '@smshop/db';
+import { createPrismaClient, ProductScope, ProductStatus } from '@smshop/db';
+
+// Mirror the application's database connection resolution: a full DATABASE_URL
+// wins, otherwise assemble it from DB_* components plus a file-backed password.
+async function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  const host = process.env.DB_HOST ?? 'db';
+  const port = process.env.DB_PORT ?? '5432';
+  const name = process.env.DB_NAME;
+  const user = process.env.DB_USER;
+  let password = process.env.DB_PASSWORD;
+  if (!password && process.env.DB_PASSWORD_FILE) {
+    password = (await readFile(process.env.DB_PASSWORD_FILE, 'utf8')).replace(/\r?\n$/, '');
+  }
+  if (!name || !user || !password) {
+    throw new Error('missing DB config: set DATABASE_URL or DB_NAME/DB_USER/DB_PASSWORD(_FILE)');
+  }
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(name)}?schema=public`;
+}
 
 const file = process.env.CATALOG_IMPORT_FILE ?? '/app/apps/api/catalog.json';
 
@@ -33,7 +53,7 @@ if (!data?.category?.slug || !Array.isArray(data?.products) || data.products.len
   process.exit(1);
 }
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient(await resolveDatabaseUrl());
 let created = 0;
 let updated = 0;
 let overLimit = 0;
