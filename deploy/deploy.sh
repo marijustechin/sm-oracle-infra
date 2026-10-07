@@ -407,6 +407,9 @@ release() {
   compose up -d --wait db >"$evidence/db-up.log" 2>&1 || finish_failure "$evidence" "$id" "db" "database failed to become healthy"
   migrate >"$evidence/migration.log" 2>&1 || finish_failure "$evidence" "$id" "migration" "migration failed; application services not started"
 
+  log "[6b/8] initializing persistent media volume ownership"
+  compose run --rm media-init >"$evidence/media-init.log" 2>&1 || finish_failure "$evidence" "$id" "media-init" "media volume initialization failed"
+
   log "[7/8] starting application and edge services"
   compose up -d api frontend >"$evidence/app-up.log" 2>&1 || finish_failure "$evidence" "$id" "app-up" "application services failed to start"
   compose up -d proxy certbot >"$evidence/edge-up.log" 2>&1 || finish_failure "$evidence" "$id" "edge-up" "proxy/certbot failed to start"
@@ -485,6 +488,7 @@ deploy() {
   compose pull frontend api db proxy certbot
   compose up -d --wait db
   migrate
+  compose run --rm media-init
   compose up -d api frontend
   # Recreating the proxy switches it from maintenance to app routing.
   compose up -d proxy certbot

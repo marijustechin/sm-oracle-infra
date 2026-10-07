@@ -116,12 +116,18 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID in google.env}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:?set GOOGLE_CALLBACK_URL in google.env}
       GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+      # Persistent product-media storage. The API writes normalized WebP images
+      # under <MEDIA_STORAGE_DIR>/products and serves /media/products/<uuid>.webp
+      # (the app-relative path stored on catalogue products).
+      MEDIA_STORAGE_DIR: /var/lib/sokoladas-media
     secrets:
       - db_app_password
       - jwt_access_secret
       - smtp_password
       - turnstile_secret_key
       - google_client_secret
+    volumes:
+      - media_data:/var/lib/sokoladas-media
     healthcheck:
       test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:3001/health/ready']
       interval: 10s
@@ -175,6 +181,23 @@ services:
     secrets:
       - db_migration_password
 
+  # One-shot ownership initializer for the persistent media volume. Docker
+  # creates named volumes root-owned, but the API runs as UID 10001 and must be
+  # able to create <MEDIA_STORAGE_DIR>/products. Run once per release before the
+  # API starts (deploy.sh release). Publishes no ports and is not long-running.
+  media-init:
+    image: ${API_IMAGE}
+    platform: linux/arm64
+    user: '0:0'
+    restart: 'no'
+    profiles: [tools]
+    networks: [app]
+    volumes:
+      - media_data:/var/lib/sokoladas-media
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - 'mkdir -p /var/lib/sokoladas-media/products && chown -R 10001:10001 /var/lib/sokoladas-media'
+
   certbot:
     image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
     platform: linux/arm64
@@ -216,6 +239,8 @@ networks:
 volumes:
   pg_data:
     name: sokoladas-staging_pg_data
+  media_data:
+    name: sokoladas-staging_media_data
   letsencrypt:
     name: sokoladas-staging_letsencrypt
   acme_webroot:
