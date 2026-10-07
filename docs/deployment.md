@@ -172,35 +172,54 @@ container replacement and redeploys.
   [`deploy/catalog-import/`](catalog-import/README.md) (idempotent, slug-keyed);
   media files are copied into the volume with UID 10001 ownership.
 
-## Scoped unattended deployment access (2026-10-07)
+## Scoped unattended deployment access (2026-10-07, extended 2026-10-07)
 
 The `deploy` host account no longer has `NOPASSWD:ALL`. It may run only the
 root-owned entry point `/usr/local/sbin/sokoladas-deploy`
 (`deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy`), which supports
-`status`, `release <id>` and `rollback <id|previous>`. The source and install
-steps live in [`deploy/entrypoint/`](entrypoint/README.md).
+`status`, `stage <id>`, `release <id>` and `rollback <id|previous>`. The source
+and install steps live in [`deploy/entrypoint/`](entrypoint/README.md).
 
 - The entry point discards the caller environment (`env -i`; `Defaults:deploy
   !setenv`), validates the release id and resolved path, requires the whole
   release tree (compose, proxy, db init, certbot, env files, manifest) to be
-  root-owned and not group/other writable, and validates the manifest (allowed
-  project GHCR repositories, immutable `@sha256:` digests, `linux/arm64`, 40-hex
-  source commit). It never runs a shell, editor, `docker`, or `systemctl` for the
+  root-owned and not group/other writable, and validates the manifest (schema,
+  matching release id, allowed project GHCR repositories, immutable `@sha256:`
+  digests, `linux/arm64`, 40-hex source commit, and rejection of unsupported
+  fields). It never runs a shell, editor, `docker`, or `systemctl` for the
   caller, and the account is not in the `docker` group.
+- `stage` builds a release directory from the versioned root-owned template at
+  `/opt/sokoladas-staging/template` and the non-secret host-env at
+  `/etc/sokoladas-staging/hostenv`; it accepts only a bounded JSON manifest on
+  stdin, pull no images and changes nothing running. An existing release id is
+  idempotent when the content is identical and is refused when it differs.
 - `release`/`rollback` map to the established manifest-driven `deploy.sh release`
   / `rollback`; rollback still only restores images and does not reverse schema
   migrations. Migration ordering and the forward-only guarantee are unchanged.
-- Recovery is independent: `ubuntu` retains SSH and passwordless sudo, the
-  previous grant is archived at `/root/90-sokoladas-deploy.pre-scoped.bak`, and
-  an administrator can always run `sudo ./deploy.sh release <id>` directly.
-- Staging a release directory remains a privileged (root/`ubuntu`) step; only its
-  execution is delegated to `deploy`.
+- `stage`, `release` and `rollback` share one root-owned lock
+  (`/opt/sokoladas-staging/state/deploy.lock`).
+- Recovery is independent: `ubuntu` retains SSH and passwordless sudo, and an
+  administrator can always run `sudo ./deploy.sh release <id>` directly.
+  Unrestricted `deploy` sudo is never restored. Template refreshes are the only
+  administrator operation ordinary releases may need.
 
-Unattended command:
+Unattended commands:
 
 ```sh
+ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy stage <release-id>' < manifest.json
 ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy release <release-id>'
+ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy status'
+ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy rollback previous'
 ```
+
+A release staged before a `deploy.sh` fix is repaired in place with the narrowly
+scoped administrator tool, which replaces only `deploy.sh` and verifies nothing
+else changes:
+
+```sh
+sudo deploy/entrypoint/install-release-script.sh <release-id>
+```
+
 
 ## Migration ordering and rollback limitations
 
@@ -217,9 +236,10 @@ Operator flow:
 
 ```text
 CI publishes build manifest  ->  human approves a release manifest
-  -> release manifest committed/staged in the infra repo
   -> operator SSHes to the host
-  -> sudo ./deploy.sh release <release-id>
+  -> sudo sokoladas-deploy stage <release-id>   (manifest on stdin;
+       validate manifest -> build root-owned release dir from the trusted template)
+  -> sudo sokoladas-deploy release <release-id>
        validate manifest -> stage images.env -> validate compose
        -> pull images -> db healthy -> migrate (explicit) -> api/frontend
        -> proxy/certbot -> health/smoke -> applied state -> evidence

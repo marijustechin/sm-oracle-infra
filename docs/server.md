@@ -1168,6 +1168,50 @@ Replaced `deploy ALL=(ALL) NOPASSWD:ALL` on `sokoladas-demo` with scoped access.
   `previousReleaseId` to the same id (deploy.sh behavior); staging a release
   directory remains a privileged manual step.
 
+> 2026-10-07 correction: the `release d006-v1` "no container recreation"
+> observation in this section was not retained as an evidence directory and can
+> no longer be independently verified; treat it as a historical report. The
+> `previousReleaseId` limitation is fixed and manual staging is superseded — see
+> the unattended staging record below.
+
+## Unattended release staging — verified 2026-10-07 — Ready for review
+
+Extended the scoped `deploy` entry point with `stage <release-id>`, so ordinary
+releases are built on the host by `deploy` without an administrator.
+
+- Installed `/usr/local/sbin/sokoladas-deploy` (root:root 0755) sha256
+  `8d42ff8d50f7307fa6b0f9b4a15388edea7b144044352a6039280702c53684f9` matches the
+  repository source; the previous version is archived at
+  `/root/sokoladas-followup-20261007/sokoladas-deploy.pre-stage.bak`.
+  `/etc/sudoers.d/90-sokoladas-deploy` is unchanged.
+- Trusted template `/opt/sokoladas-staging/template` (VERSION
+  `tree-be12317d…`) and non-secret host-env `/etc/sokoladas-staging/hostenv`
+  (seeded from `d006-v1`; `smtp.env`/`google.env` hashes match) are root-owned
+  and not group/other writable.
+- `d006-v1/deploy.sh` repaired in place with the administrator tool (before
+  `09226cdd…`, after `7cdfe1ad…`); the manifest, `images.env`, rollback target
+  and the original evidence directory were not modified.
+- Staging: `stage d006-pipeline-check` through `deploy` using the `d006-v1`
+  digests produced a root-owned release the entry point accepts
+  (`resolve_release_dir` + `validate_manifest`); identical re-stage was an
+  idempotent no-op; different content, an executable payload and an unknown
+  manifest field were all refused; no `.staging-*` leftovers.
+- Reapplication: `release d006-v1` kept `previousReleaseId: d005-v1`, recreated
+  no container (identical ids and `StartedAt`), changed no data (5 products, 5
+  media files) and reported "No pending migrations to apply"; evidence
+  `/opt/sokoladas-staging/evidence/20261007T204651Z-d006-v1/` `finalStatus:
+  success`.
+- Denied as `deploy`: `sudo whoami`, `sudo bash`, `sudo docker ps`,
+  `sudo systemctl`, `sudo cat /etc/shadow`, direct `docker ps`,
+  `sudo VAR=value …`, secret-file read and releases-root write; `sudo -l` lists
+  only the entry point.
+- Lock: a `stage` waited ~8 s for a root-held
+  `/opt/sokoladas-staging/state/deploy.lock`, confirming serialization.
+- Limitation: a full stage→release of a new application version was not
+  performed; rollback was verified in isolation (local checks and safe
+  precondition failures) without switching the live application. The staged
+  verification release `d006-pipeline-check` remains staged and unapplied.
+
 ## Current unknowns and prerequisites
 
 | Area | Recorded limitation / prerequisite |

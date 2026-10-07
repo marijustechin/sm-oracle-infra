@@ -2,6 +2,72 @@
 
 ## 2026-10-07
 
+### Unattended release staging through the `deploy` entry point — Ready for review
+
+Extended the scoped entry point with `stage <release-id>` so ordinary releases no
+longer need an administrator to build the release directory.
+
+- `deploy/entrypoint/sokoladas-deploy`: new `stage` command. It accepts only a
+  bounded (≤ 64 KiB) JSON manifest on stdin, writes it to a private root-owned
+  temporary file, and validates it strictly (schema, matching `releaseId`,
+  `source.repository`, immutable GHCR digests, `linux/arm64`, 40-hex commit, and
+  rejection of unknown fields). A shared root-owned lock
+  (`/opt/sokoladas-staging/state/deploy.lock`) serializes `stage`/`release`/
+  `rollback` and is held across `exec`. The release tree must contain no symlinks
+  or special files; the expected owner is root under sudo.
+- `deploy/stage.sh`: builds the release directory from the versioned, root-owned
+  template (`/opt/sokoladas-staging/template`) and non-secret host-env
+  (`/etc/sokoladas-staging/hostenv`), atomically (private temp dir + single
+  rename). Re-staging an id with identical content is idempotent; different
+  content is refused; historical release directories are never rebuilt.
+- `deploy/entrypoint/install-template.sh` (administrator): installs/refreshes the
+  template and host-env. `deploy/entrypoint/install-release-script.sh`
+  (administrator): replaces only `deploy.sh` in an existing release and refuses
+  if any other file would change.
+- `deploy/deploy.sh`: re-applying the already-applied release no longer moves
+  `previousReleaseId`.
+- Tests: `scripts/tests/test_deploy_release.sh` 41 checks (adds rollback-state
+  preservation), `scripts/tests/test_entrypoint.sh` 29, `scripts/tests/test_stage.sh`
+  24 — all passing.
+
+Installed and verified live on `sokoladas-demo`:
+
+- Entry point `/usr/local/sbin/sokoladas-deploy` (root:root 0755) sha256
+  `8d42ff8d50f7307fa6b0f9b4a15388edea7b144044352a6039280702c53684f9` matches the
+  repository source; the previous version is archived at
+  `/root/sokoladas-followup-20261007/sokoladas-deploy.pre-stage.bak`. Sudoers is
+  unchanged (`deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy`).
+- Template installed at `/opt/sokoladas-staging/template` (VERSION
+  `tree-be12317d0a41d9e390a3851b410f8c8d43e447682aff92bbea0e50fcd1fb0e26`);
+  host-env at `/etc/sokoladas-staging/hostenv` seeded from `d006-v1` (hashes
+  match). Both are root-owned and not group/other writable.
+- `d006-v1/deploy.sh` repaired in place with the administrator tool (before
+  `09226cdd…`, after `7cdfe1ad…`); the release manifest, `images.env`, rollback
+  target and original evidence were untouched.
+- `stage d006-pipeline-check` through `deploy` (current `d006-v1` image digests)
+  built a root-owned release accepted by the entry point; re-staging identical
+  content was an idempotent no-op; different content, an executable payload and
+  an unknown field were all refused; no staging leftovers remained.
+- `release d006-v1` re-applied the current release: `previousReleaseId` stayed
+  `d005-v1`, no container was recreated (identical ids and `StartedAt`), no data
+  changed (5 catalogue products, 5 media files), and the migration reported "No
+  pending migrations to apply". Evidence
+  `/opt/sokoladas-staging/evidence/20261007T204651Z-d006-v1/` `finalStatus:
+  success`.
+- Re-checked as `deploy`: arbitrary sudo, `sudo bash`, `sudo docker ps`,
+  `sudo systemctl`, `sudo cat /etc/shadow`, direct `docker ps`,
+  `sudo VAR=value …`, secret-file read and release-root write are all refused;
+  only the entry point is permitted. Lock serialization was observed live (a
+  `stage` waited ~8 s for a held lock).
+
+Limitations: a full stage→release of a *new application version* was not
+performed — the current digests were staged and the current release re-applied.
+Rollback was tested in isolation (local checks plus safe precondition failures),
+not by switching the live application; the staged verification release
+`d006-pipeline-check` remains staged and was never applied.
+
+Ready for review, not Human accepted.
+
 ### Scoped deployment access — `deploy` unrestricted sudo removed — Ready for review
 
 Replaced `deploy ALL=(ALL) NOPASSWD:ALL` on `sokoladas-demo` with a single
@@ -31,6 +97,15 @@ root-owned entry point.
   directory remains a privileged manual step.
 
 Ready for review, not Human accepted.
+
+> **2026-10-07 correction.** The scoped-deploy verification recorded here claimed
+> `release d006-v1` "completed with no container recreation", but no evidence
+> directory from that `release` run was retained (only the 21:57/21:59 local
+> `d006-v1` evidence exists); that observation can no longer be independently
+> verified and is a historical report only. The `previousReleaseId` limitation is
+> fixed in `deploy/deploy.sh`, and "staging a release directory remains a
+> privileged manual step" is superseded by the unattended staging entry above
+> (2026-10-07).
 
 ### D-006 release d006-v1 deployed (catalogue + persistent media) — Ready for review
 

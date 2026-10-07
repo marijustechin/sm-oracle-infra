@@ -384,6 +384,14 @@ release() {
   api_ref="$(manifest_field "$manifest" "images.api.ref")"
   infra="$(manifest_field "$manifest" "infra.contractCommit")"
   previous="$(read_applied_field releaseId || true)"
+  # Re-applying the release that is already applied (a convergence/retry no-op)
+  # must not move the rollback target: keep the previously recorded
+  # previousReleaseId instead of pointing "previous" at the current release id.
+  if [[ -n "$id" && "$id" == "$previous" ]]; then
+    local recorded_previous
+    recorded_previous="$(read_applied_field previousReleaseId || true)"
+    previous="$recorded_previous"
+  fi
   write_summary_header "$evidence" "$id" "$commit" "$web_ref" "$api_ref" "$infra" "$previous"
 
   log "[1/8] staging host-only images.env from approved manifest"

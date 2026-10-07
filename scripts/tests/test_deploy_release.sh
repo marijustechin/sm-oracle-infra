@@ -214,6 +214,21 @@ else
   not_ok "release success writes applied.json"
 fi
 
+# Re-applying the identical, already-applied release is a convergence/retry
+# no-op for the rollback target: previousReleaseId must be preserved.
+write_applied_state "$SOKOLADAS_MANIFEST_DIR/rel-1.json" "rel-1" "rel-0" >/dev/null 2>&1
+( release rel-1 ) >/dev/null 2>&1
+assert_zero "re-applying the applied release exits zero" $?
+assert_eq "re-apply keeps the applied releaseId" "$(read_applied_field releaseId)" "rel-1"
+assert_eq "re-apply preserves previousReleaseId" "$(read_applied_field previousReleaseId)" "rel-0"
+
+# Applying a different release still moves the rollback target to the release
+# that was applied immediately before it.
+( release rel-0 ) >/dev/null 2>&1
+assert_zero "deploying a different release exits zero" $?
+assert_eq "different release becomes applied" "$(read_applied_field releaseId)" "rel-0"
+assert_eq "previous moves to the prior applied release" "$(read_applied_field previousReleaseId)" "rel-1"
+
 rm -f "$SOKOLADAS_STATE_DIR/applied.json"
 (
   compose() {
@@ -236,6 +251,16 @@ if ls "$SOKOLADAS_EVIDENCE_DIR" | grep -q 'rel-0'; then
 else
   not_ok "failed release retains evidence"
 fi
+
+# ---------------------------------------------------------------------------
+# Rollback: state preservation / roll-forward target
+# ---------------------------------------------------------------------------
+write_applied_state "$SOKOLADAS_MANIFEST_DIR/rel-1.json" "rel-1" "rel-0" >/dev/null 2>&1
+( rollback rel-0 ) >/dev/null 2>&1
+assert_zero "rollback exits zero" $?
+assert_eq "rollback becomes the applied release" "$(read_applied_field releaseId)" "rel-0"
+assert_eq "rollback preserves the prior release as roll-forward target" \
+  "$(read_applied_field previousReleaseId)" "rel-1"
 
 # ---------------------------------------------------------------------------
 # Static safety: no destructive DB commands / no docker socket / no SSH

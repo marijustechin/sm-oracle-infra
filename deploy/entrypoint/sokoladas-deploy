@@ -3,20 +3,26 @@
 # account on sokoladas-demo.
 #
 # It replaces `deploy ALL=(ALL) NOPASSWD:ALL` with a single, reviewed command.
-# The `deploy` account may only run: `status`, `release <id>`, or
+# The `deploy` account may only run: `status`, `stage <id>`, `release <id>`, or
 # `rollback <id|previous>`. Everything else is rejected.
 #
 # The compromise boundary is deliberately narrow:
 #   - the caller's environment is discarded (`env -i`), so SOKOLADAS_* /
 #     COMPOSE_* overrides cannot redirect the compose file, volume mounts,
-#     env files, state or evidence paths;
-#   - the release directory and every file it uses must be root-owned and not
+#     env files, state, template or evidence paths;
+#   - `stage` accepts only a bounded JSON manifest on stdin. The manifest is
+#     written to a private root-owned temporary file and validated before use;
+#     no scripts, archives, Compose files or caller paths are accepted;
+#   - a release directory and every file it uses must be root-owned and not
 #     writable by group/other (a deploy-writable manifest or config is refused);
 #   - the release id is a strict, slash-free token and the resolved directory
 #     must stay under the fixed releases root;
 #   - the release manifest is validated: schema, matching releaseId, image
 #     references restricted to the project's own GHCR repositories and pinned by
-#     immutable sha256 digest, `linux/arm64` platform, 40-hex source commit.
+#     immutable sha256 digest, `linux/arm64` platform, 40-hex source commit, and
+#     no unsupported fields that could affect execution;
+#   - stage, release and rollback share one root-owned lock, so they cannot run
+#     concurrently.
 #
 # It never runs a shell, editor, docker or systemctl on the caller's behalf.
 set -euo pipefail
@@ -26,12 +32,36 @@ export PATH
 
 RELEASES_ROOT=/opt/sokoladas-staging/releases
 STATE_DIR=/opt/sokoladas-staging/state
+TEMPLATE_ROOT=/opt/sokoladas-staging/template
+HOSTENV_ROOT=/etc/sokoladas-staging/hostenv
 APPLIED_FILE="$STATE_DIR/applied.json"
+LOCK_FILE="$STATE_DIR/deploy.lock"
+LOCK_TIMEOUT=300
+MAX_MANIFEST_BYTES=65536
 PROJECT=sokoladas-staging
 DOMAIN=sokoladas.eu
 
+# The real entry point always runs as root (via `sudo`), and sudo's `env_reset`
+# plus `Defaults:deploy !setenv` discard the caller environment. These overrides
+# exist only so the deterministic tests can point at temporary directories when
+# the script is sourced/run as a non-root user; they are ignored under sudo.
+if [[ "$(id -u)" -ne 0 ]]; then
+  RELEASES_ROOT="${SOKOLADAS_RELEASES_ROOT:-$RELEASES_ROOT}"
+  STATE_DIR="${SOKOLADAS_STATE_DIR:-$STATE_DIR}"
+  TEMPLATE_ROOT="${SOKOLADAS_TEMPLATE_ROOT:-$TEMPLATE_ROOT}"
+  HOSTENV_ROOT="${SOKOLADAS_HOSTENV_ROOT:-$HOSTENV_ROOT}"
+  APPLIED_FILE="${SOKOLADAS_APPLIED_FILE:-$APPLIED_FILE}"
+  LOCK_FILE="${SOKOLADAS_LOCK_FILE:-$LOCK_FILE}"
+  LOCK_TIMEOUT="${SOKOLADAS_LOCK_TIMEOUT:-$LOCK_TIMEOUT}"
+  MAX_MANIFEST_BYTES="${SOKOLADAS_MAX_MANIFEST_BYTES:-$MAX_MANIFEST_BYTES}"
+fi
+
 ID_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
 INVOKER="${SUDO_USER:-$(id -un)}"
+# Under `sudo` the entry point runs as root and everything it touches must be
+# root-owned. A non-root invocation is only used by the deterministic tests, so
+# the expected owner is the invoking uid (0 under sudo).
+EXPECTED_OWNER="$(id -u)"
 
 die() {
   printf 'sokoladas-deploy: %s\n' "$*" >&2
@@ -47,35 +77,42 @@ usage() {
 usage: sokoladas-deploy <command> [argument]
 
   status                     show applied release, containers and public health
+  stage <release-id>         build a root-owned release directory from a JSON
+                             manifest read on stdin and the trusted template
+                             (no images are pulled and nothing is deployed)
   release <release-id>       deploy an already-staged, approved release
   rollback <release-id|previous>
                              restore a previously approved release's images
 
 The command runs as root without a password. Arguments are validated; the
 release directory and manifest must be root-owned and not writable by the
-calling account.
+calling account, and the staged release is built from a root-owned template.
 USAGE
 }
 
-# A file/dir used for deployment must be root-owned and not group/other writable.
+# A file/dir used for deployment must be owned by the expected owner (root under
+# sudo) and not group/other writable.
 require_root_owned() {
   local path="$1" label="${2:-$1}"
   [[ -e "$path" ]] || die "missing $label: $path"
   local uid
   uid="$(stat -c '%u' "$path")"
-  [[ "$uid" == "0" ]] || die "$label is not root-owned: $path"
+  [[ "$uid" == "$EXPECTED_OWNER" ]] || die "$label is not owned by uid $EXPECTED_OWNER: $path"
   if [[ -n "$(find "$path" -maxdepth 0 \( -perm -0020 -o -perm -0002 \) -print -quit 2>/dev/null)" ]]; then
     die "$label is writable by group/other: $path"
   fi
 }
 
-# Every file in the release tree must be root-owned and not group/other writable:
-# the tree holds container-mounted configuration (proxy, db init, certbot) and
-# staged manifests, all of which the caller must not be able to influence.
+# Every file in the release tree must be owned by the expected owner and not
+# group/other writable, and the tree must contain no symlinks or special files:
+# it holds container-mounted configuration (proxy, db init, certbot) and staged
+# manifests, all of which the caller must not be able to influence.
 require_tree_root_owned() {
   local root="$1" offender
-  offender="$(find "$root" \( ! -uid 0 -o -perm -0020 -o -perm -0002 \) -print -quit 2>/dev/null || true)"
-  [[ -z "$offender" ]] || die "release tree has a non-root-owned or group/other-writable entry: $offender"
+  offender="$(find "$root" \( -type l -o \( ! -type d -a ! -type f \) \) -print -quit 2>/dev/null || true)"
+  [[ -z "$offender" ]] || die "release tree contains a symlink or special file: $offender"
+  offender="$(find "$root" \( ! -uid "$EXPECTED_OWNER" -o -perm -0020 -o -perm -0002 \) -print -quit 2>/dev/null || true)"
+  [[ -z "$offender" ]] || die "release tree has a non-$EXPECTED_OWNER-owned or group/other-writable entry: $offender"
 }
 
 resolve_release_dir() {
@@ -98,7 +135,8 @@ resolve_release_dir() {
 }
 
 # Validate the manifest content. Allow only the project's own image repositories
-# pinned by immutable digest, the correct platform, and a matching release id.
+# pinned by immutable digest, the correct platform, a matching release id, a
+# full source commit and no unsupported fields that could affect execution.
 validate_manifest() {
   local id="$1" manifest="$2"
   python3 - "$id" "$manifest" <<'PY' || die "release manifest rejected: $id"
@@ -119,28 +157,99 @@ def fail(message):
     print(f"sokoladas-deploy: manifest rejected: {message}", file=sys.stderr)
     sys.exit(1)
 
+def require_object(value, field):
+    if not isinstance(value, dict):
+        fail(f"{field} must be an object")
+    return value
+
+def reject_unknown(value, allowed, field):
+    extra = sorted(set(value) - set(allowed))
+    if extra:
+        fail(f"{field} has unsupported field(s): {', '.join(extra)}")
+
+if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", release_id):
+    fail("requested release id is invalid")
+
+require_object(manifest, "manifest")
+reject_unknown(
+    manifest,
+    {"schemaVersion", "releaseId", "createdAt", "source", "ci", "images", "infra", "notes"},
+    "manifest",
+)
+
 if manifest.get("schemaVersion") != 1:
     fail("unsupported schemaVersion")
 if manifest.get("releaseId") != release_id:
     fail("releaseId does not match the requested release")
 
+source = require_object(manifest.get("source", {}), "source")
+reject_unknown(source, {"repository", "commit", "ref"}, "source")
+if source.get("repository") != "github.com/marijustechin/smshop":
+    fail("source.repository must be github.com/marijustechin/smshop")
+commit = source.get("commit", "")
+if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+    fail("source.commit must be a full 40-character hex SHA")
+if "ref" in source and not isinstance(source["ref"], str):
+    fail("source.ref must be a string")
+
+if "ci" in manifest:
+    ci = require_object(manifest["ci"], "ci")
+    reject_unknown(ci, {"imagesRunId"}, "ci")
+    if "imagesRunId" in ci and not isinstance(ci["imagesRunId"], str):
+        fail("ci.imagesRunId must be a string")
+
+images = require_object(manifest.get("images", {}), "images")
+reject_unknown(images, {"web", "api"}, "images")
 allowed = {
     "web": re.compile(r"^ghcr\.io/marijustechin/smshop-web@sha256:[0-9a-f]{64}$"),
     "api": re.compile(r"^ghcr\.io/marijustechin/smshop-api@sha256:[0-9a-f]{64}$"),
 }
-images = manifest.get("images", {})
 for key in ("web", "api"):
-    entry = images.get(key) or {}
+    entry = require_object(images.get(key), f"images.{key}")
+    reject_unknown(entry, {"ref", "platform", "tag"}, f"images.{key}")
     ref = entry.get("ref", "")
-    if not allowed[key].match(ref):
+    if not isinstance(ref, str) or not allowed[key].match(ref):
         fail(f"{key} image must be ghcr.io/marijustechin/smshop-{key} pinned by @sha256")
     if entry.get("platform") != "linux/arm64":
         fail(f"{key} platform must be linux/arm64")
+    if "tag" in entry and not isinstance(entry["tag"], str):
+        fail(f"images.{key}.tag must be a string")
 
-commit = (manifest.get("source") or {}).get("commit", "")
-if not re.fullmatch(r"[0-9a-f]{40}", commit):
-    fail("source.commit must be a full 40-character hex SHA")
+if "infra" in manifest:
+    infra = require_object(manifest["infra"], "infra")
+    reject_unknown(infra, {"contractCommit"}, "infra")
+    if "contractCommit" in infra and not isinstance(infra["contractCommit"], str):
+        fail("infra.contractCommit must be a string")
+
+if "notes" in manifest and not isinstance(manifest["notes"], str):
+    fail("notes must be a string")
+if "createdAt" in manifest and not isinstance(manifest["createdAt"], str):
+    fail("createdAt must be a string")
 PY
+}
+
+# Read at most `max` bytes from stdin into `out`. Returns non-zero if stdin is
+# empty or larger than the bound (the writer is not fully drained on overflow).
+read_bounded_stdin() {
+  local max="$1" out="$2" bytes
+  head -c "$((max + 1))" >"$out" || return 1
+  bytes="$(wc -c <"$out" | tr -d ' ')"
+  [[ "$bytes" -gt 0 && "$bytes" -le "$max" ]]
+}
+
+# Shared, root-owned serialization lock for stage/release/rollback. The lock is
+# held on fd 9 and survives `exec`, so the delegated deploy.sh/stage.sh keep it
+# until they exit. It is acquired once per process, so a command may call another
+# command function without deadlocking.
+_LOCK_HELD=0
+acquire_lock() {
+  [[ "$_LOCK_HELD" == "1" ]] && return 0
+  mkdir -p "$STATE_DIR" || die "cannot create state directory: $STATE_DIR"
+  exec 9>"$LOCK_FILE" || die "cannot open lock file: $LOCK_FILE"
+  if ! flock -w "$LOCK_TIMEOUT" 9; then
+    die "another stage/release/rollback is already in progress"
+  fi
+  _LOCK_HELD=1
 }
 
 previous_release_id() {
@@ -165,6 +274,9 @@ cmd_status() {
     echo "(no applied state recorded)"
   fi
   echo
+  echo "== staged releases ($RELEASES_ROOT) =="
+  find "$RELEASES_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.staging-*' -printf '%f\n' 2>/dev/null | sort
+  echo
   echo "== containers (project $PROJECT) =="
   docker ps -a --filter "name=$PROJECT" --format '{{.Names}}\t{{.Status}}\t{{.Image}}'
   echo
@@ -173,7 +285,37 @@ cmd_status() {
   printf 'unauthenticated /api/auth/me: %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$DOMAIN/api/auth/me" || echo 000)"
 }
 
+cmd_stage() {
+  acquire_lock
+  [[ $# -eq 1 ]] || die "usage: stage <release-id>"
+  local id="$1" manifest
+  [[ "$id" =~ $ID_RE ]] || die "invalid release id: $id"
+  require_root_owned "$TEMPLATE_ROOT" "template root"
+  require_root_owned "$TEMPLATE_ROOT/stage.sh" "template stage.sh"
+  require_root_owned "$TEMPLATE_ROOT/deploy.sh" "template deploy.sh"
+  require_root_owned "$HOSTENV_ROOT" "host-env root"
+
+  manifest="$(mktemp "${TMPDIR:-/tmp}/sokoladas-manifest.XXXXXX")" || die "cannot create manifest temporary file"
+  chmod 0600 "$manifest"
+  if ! read_bounded_stdin "$MAX_MANIFEST_BYTES" "$manifest"; then
+    rm -f "$manifest"
+    die "stdin must carry one JSON manifest of at most $MAX_MANIFEST_BYTES bytes"
+  fi
+  if ! validate_manifest "$id" "$manifest"; then
+    rm -f "$manifest"
+    die "release manifest rejected: $id"
+  fi
+
+  log "staging $id from the trusted template (environment discarded)"
+  local rc=0
+  env -i PATH="$PATH" HOME=/root SUDO_USER="$INVOKER" \
+    bash "$TEMPLATE_ROOT/stage.sh" "$id" "$manifest" "$RELEASES_ROOT" "$TEMPLATE_ROOT" "$HOSTENV_ROOT" || rc=$?
+  rm -f "$manifest"
+  return "$rc"
+}
+
 cmd_release() {
+  acquire_lock
   [[ $# -eq 1 ]] || die "usage: release <release-id>"
   local id="$1" dir
   dir="$(resolve_release_dir "$id")"
@@ -184,6 +326,7 @@ cmd_release() {
 }
 
 cmd_rollback() {
+  acquire_lock
   [[ $# -eq 1 ]] || die "usage: rollback <release-id|previous>"
   local target="$1" dir
   if [[ "$target" == "previous" ]]; then
@@ -203,6 +346,7 @@ main() {
   shift || true
   case "$sub" in
     status) cmd_status "$@" ;;
+    stage) cmd_stage "$@" ;;
     release) cmd_release "$@" ;;
     rollback) cmd_rollback "$@" ;;
     -h | --help | help) usage ;;
@@ -210,4 +354,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
