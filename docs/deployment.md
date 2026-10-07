@@ -172,6 +172,36 @@ container replacement and redeploys.
   [`deploy/catalog-import/`](catalog-import/README.md) (idempotent, slug-keyed);
   media files are copied into the volume with UID 10001 ownership.
 
+## Scoped unattended deployment access (2026-10-07)
+
+The `deploy` host account no longer has `NOPASSWD:ALL`. It may run only the
+root-owned entry point `/usr/local/sbin/sokoladas-deploy`
+(`deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy`), which supports
+`status`, `release <id>` and `rollback <id|previous>`. The source and install
+steps live in [`deploy/entrypoint/`](entrypoint/README.md).
+
+- The entry point discards the caller environment (`env -i`; `Defaults:deploy
+  !setenv`), validates the release id and resolved path, requires the whole
+  release tree (compose, proxy, db init, certbot, env files, manifest) to be
+  root-owned and not group/other writable, and validates the manifest (allowed
+  project GHCR repositories, immutable `@sha256:` digests, `linux/arm64`, 40-hex
+  source commit). It never runs a shell, editor, `docker`, or `systemctl` for the
+  caller, and the account is not in the `docker` group.
+- `release`/`rollback` map to the established manifest-driven `deploy.sh release`
+  / `rollback`; rollback still only restores images and does not reverse schema
+  migrations. Migration ordering and the forward-only guarantee are unchanged.
+- Recovery is independent: `ubuntu` retains SSH and passwordless sudo, the
+  previous grant is archived at `/root/90-sokoladas-deploy.pre-scoped.bak`, and
+  an administrator can always run `sudo ./deploy.sh release <id>` directly.
+- Staging a release directory remains a privileged (root/`ubuntu`) step; only its
+  execution is delegated to `deploy`.
+
+Unattended command:
+
+```sh
+ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy release <release-id>'
+```
+
 ## Migration ordering and rollback limitations
 
 - Order: start `db` → wait `service_healthy` → run the one-shot `migrate` (`prisma migrate deploy`) to exit 0 → start `api`/`frontend` → activate the app-routing proxy → verify.

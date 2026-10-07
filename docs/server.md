@@ -1136,6 +1136,38 @@ manifest `a63eefe`. Previous release `d005-v1`.
 - Rollback boundary: `sudo ./deploy.sh rollback previous` restores `d005-v1`
   images only; migrations are forward-only and the media volume is untouched.
 
+## Scoped deployment access — verified 2026-10-07 — Ready for review
+
+Replaced `deploy ALL=(ALL) NOPASSWD:ALL` on `sokoladas-demo` with scoped access.
+
+- `/usr/local/sbin/sokoladas-deploy` root:root 0755 (source
+  `deploy/entrypoint/`): `status`, `release <id>`, `rollback <id|previous>` only.
+- `/etc/sudoers.d/90-sokoladas-deploy` root:root 0440:
+  `Defaults:deploy env_reset`, `Defaults:deploy !setenv`,
+  `deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy`; validated with
+  `visudo -cf` before activation and `visudo -c` after. Previous grant archived
+  at `/root/90-sokoladas-deploy.pre-scoped.bak`.
+- `deploy` groups are `deploy users` (never added to `docker`); direct `docker`
+  and all other sudo commands are denied.
+- Entry point safety: caller environment discarded (`env -i`); release id
+  validated and resolved under `/opt/sokoladas-staging/releases`; the whole
+  release tree must be root-owned and not group/other writable; the manifest must
+  reference only `ghcr.io/marijustechin/smshop-web` / `smshop-api` pinned by
+  immutable `@sha256:`, `linux/arm64`, 40-hex commit.
+- Directly observed as `deploy`: `sudo -n -l` shows only the entry point;
+  `sudo whoami`, `sudo bash`, `sudo docker ps`, `sudo systemctl`, `sudo cat
+  /etc/shadow`, direct `docker ps` and `sudo VAR=value …` all denied (rc≠0);
+  malformed ids and manifests rejected before any deploy; `status` returns the
+  applied state, containers and public health; `release d006-v1` completed
+  (rc=0) with **no container recreation** (identical container ids/StartedAt) and
+  "No pending migrations to apply".
+- Recovery: `ubuntu` SSH + passwordless sudo unchanged and independent of the
+  `deploy` path; an administrator can always run `sudo ./deploy.sh release <id>`
+  directly.
+- Limitation: re-running `release <id>` for the already-applied id rewrites
+  `previousReleaseId` to the same id (deploy.sh behavior); staging a release
+  directory remains a privileged manual step.
+
 ## Current unknowns and prerequisites
 
 | Area | Recorded limitation / prerequisite |

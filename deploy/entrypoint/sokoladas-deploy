@@ -1,0 +1,213 @@
+#!/bin/bash
+# sokoladas-deploy — root-owned, scoped deployment entry point for the `deploy`
+# account on sokoladas-demo.
+#
+# It replaces `deploy ALL=(ALL) NOPASSWD:ALL` with a single, reviewed command.
+# The `deploy` account may only run: `status`, `release <id>`, or
+# `rollback <id|previous>`. Everything else is rejected.
+#
+# The compromise boundary is deliberately narrow:
+#   - the caller's environment is discarded (`env -i`), so SOKOLADAS_* /
+#     COMPOSE_* overrides cannot redirect the compose file, volume mounts,
+#     env files, state or evidence paths;
+#   - the release directory and every file it uses must be root-owned and not
+#     writable by group/other (a deploy-writable manifest or config is refused);
+#   - the release id is a strict, slash-free token and the resolved directory
+#     must stay under the fixed releases root;
+#   - the release manifest is validated: schema, matching releaseId, image
+#     references restricted to the project's own GHCR repositories and pinned by
+#     immutable sha256 digest, `linux/arm64` platform, 40-hex source commit.
+#
+# It never runs a shell, editor, docker or systemctl on the caller's behalf.
+set -euo pipefail
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+RELEASES_ROOT=/opt/sokoladas-staging/releases
+STATE_DIR=/opt/sokoladas-staging/state
+APPLIED_FILE="$STATE_DIR/applied.json"
+PROJECT=sokoladas-staging
+DOMAIN=sokoladas.eu
+
+ID_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+INVOKER="${SUDO_USER:-$(id -un)}"
+
+die() {
+  printf 'sokoladas-deploy: %s\n' "$*" >&2
+  exit 64
+}
+
+log() {
+  printf 'sokoladas-deploy: %s\n' "$*"
+}
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: sokoladas-deploy <command> [argument]
+
+  status                     show applied release, containers and public health
+  release <release-id>       deploy an already-staged, approved release
+  rollback <release-id|previous>
+                             restore a previously approved release's images
+
+The command runs as root without a password. Arguments are validated; the
+release directory and manifest must be root-owned and not writable by the
+calling account.
+USAGE
+}
+
+# A file/dir used for deployment must be root-owned and not group/other writable.
+require_root_owned() {
+  local path="$1" label="${2:-$1}"
+  [[ -e "$path" ]] || die "missing $label: $path"
+  local uid
+  uid="$(stat -c '%u' "$path")"
+  [[ "$uid" == "0" ]] || die "$label is not root-owned: $path"
+  if [[ -n "$(find "$path" -maxdepth 0 \( -perm -0020 -o -perm -0002 \) -print -quit 2>/dev/null)" ]]; then
+    die "$label is writable by group/other: $path"
+  fi
+}
+
+# Every file in the release tree must be root-owned and not group/other writable:
+# the tree holds container-mounted configuration (proxy, db init, certbot) and
+# staged manifests, all of which the caller must not be able to influence.
+require_tree_root_owned() {
+  local root="$1" offender
+  offender="$(find "$root" \( ! -uid 0 -o -perm -0020 -o -perm -0002 \) -print -quit 2>/dev/null || true)"
+  [[ -z "$offender" ]] || die "release tree has a non-root-owned or group/other-writable entry: $offender"
+}
+
+resolve_release_dir() {
+  local id="$1" real
+  [[ "$id" =~ $ID_RE ]] || die "invalid release id: $id"
+  real="$(realpath -e "$RELEASES_ROOT/$id" 2>/dev/null)" || die "release not staged: $id"
+  case "$real" in
+    "$RELEASES_ROOT"/*) ;;
+    *) die "release path escapes $RELEASES_ROOT: $real" ;;
+  esac
+  require_root_owned "$real" "release dir"
+  require_root_owned "$real/deploy.sh" "deploy.sh"
+  require_root_owned "$real/compose.yaml" "compose.yaml"
+  require_root_owned "$real/smtp.env" "smtp.env"
+  require_root_owned "$real/google.env" "google.env"
+  require_root_owned "$real/releases" "releases dir"
+  require_root_owned "$real/releases/$id.json" "release manifest"
+  require_tree_root_owned "$real"
+  printf '%s' "$real"
+}
+
+# Validate the manifest content. Allow only the project's own image repositories
+# pinned by immutable digest, the correct platform, and a matching release id.
+validate_manifest() {
+  local id="$1" manifest="$2"
+  python3 - "$id" "$manifest" <<'PY' || die "release manifest rejected: $id"
+import json
+import re
+import sys
+
+release_id, path = sys.argv[1], sys.argv[2]
+
+try:
+    with open(path, encoding="utf-8") as handle:
+        manifest = json.load(handle)
+except (OSError, json.JSONDecodeError) as error:
+    print(f"sokoladas-deploy: cannot read manifest: {error}", file=sys.stderr)
+    sys.exit(1)
+
+def fail(message):
+    print(f"sokoladas-deploy: manifest rejected: {message}", file=sys.stderr)
+    sys.exit(1)
+
+if manifest.get("schemaVersion") != 1:
+    fail("unsupported schemaVersion")
+if manifest.get("releaseId") != release_id:
+    fail("releaseId does not match the requested release")
+
+allowed = {
+    "web": re.compile(r"^ghcr\.io/marijustechin/smshop-web@sha256:[0-9a-f]{64}$"),
+    "api": re.compile(r"^ghcr\.io/marijustechin/smshop-api@sha256:[0-9a-f]{64}$"),
+}
+images = manifest.get("images", {})
+for key in ("web", "api"):
+    entry = images.get(key) or {}
+    ref = entry.get("ref", "")
+    if not allowed[key].match(ref):
+        fail(f"{key} image must be ghcr.io/marijustechin/smshop-{key} pinned by @sha256")
+    if entry.get("platform") != "linux/arm64":
+        fail(f"{key} platform must be linux/arm64")
+
+commit = (manifest.get("source") or {}).get("commit", "")
+if not re.fullmatch(r"[0-9a-f]{40}", commit):
+    fail("source.commit must be a full 40-character hex SHA")
+PY
+}
+
+previous_release_id() {
+  [[ -f "$APPLIED_FILE" ]] || die "no applied state; specify an explicit release id"
+  python3 - "$APPLIED_FILE" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        print(json.load(handle).get("previousReleaseId") or "")
+except (OSError, json.JSONDecodeError):
+    print("")
+PY
+}
+
+cmd_status() {
+  [[ $# -eq 0 ]] || die "status takes no arguments"
+  echo "== applied release ($APPLIED_FILE) =="
+  if [[ -f "$APPLIED_FILE" ]]; then
+    cat "$APPLIED_FILE"
+  else
+    echo "(no applied state recorded)"
+  fi
+  echo
+  echo "== containers (project $PROJECT) =="
+  docker ps -a --filter "name=$PROJECT" --format '{{.Names}}\t{{.Status}}\t{{.Image}}'
+  echo
+  echo "== public health =="
+  printf 'apex /health/ready: %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$DOMAIN/health/ready" || echo 000)"
+  printf 'unauthenticated /api/auth/me: %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$DOMAIN/api/auth/me" || echo 000)"
+}
+
+cmd_release() {
+  [[ $# -eq 1 ]] || die "usage: release <release-id>"
+  local id="$1" dir
+  dir="$(resolve_release_dir "$id")"
+  validate_manifest "$id" "$dir/releases/$id.json"
+  log "validated release $id; deploying as root (environment discarded)"
+  exec env -i PATH="$PATH" HOME=/root SUDO_USER="$INVOKER" \
+    bash "$dir/deploy.sh" release "$id"
+}
+
+cmd_rollback() {
+  [[ $# -eq 1 ]] || die "usage: rollback <release-id|previous>"
+  local target="$1" dir
+  if [[ "$target" == "previous" ]]; then
+    target="$(previous_release_id)"
+    [[ -n "$target" ]] || die "no previous release recorded in applied state"
+  fi
+  dir="$(resolve_release_dir "$target")"
+  validate_manifest "$target" "$dir/releases/$target.json"
+  log "validated rollback target $target (schema migrations are NOT reversed)"
+  exec env -i PATH="$PATH" HOME=/root SUDO_USER="$INVOKER" \
+    bash "$dir/deploy.sh" rollback "$target"
+}
+
+main() {
+  local sub="${1:-}"
+  [[ -n "$sub" ]] || { usage; die "a command is required"; }
+  shift || true
+  case "$sub" in
+    status) cmd_status "$@" ;;
+    release) cmd_release "$@" ;;
+    rollback) cmd_rollback "$@" ;;
+    -h | --help | help) usage ;;
+    *) usage; die "unknown command: $sub" ;;
+  esac
+}
+
+main "$@"

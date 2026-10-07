@@ -22,7 +22,7 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 - [ ] Invited staging access: the reviewed `nginx.conf` currently has the `auth_basic` gate disabled, so the application is publicly reachable. Decide whether to enable the invited-access gate; uploads/payments remain disabled
 - [ ] Verify clean deploy from scratch and test rollback with explicit migration-rollback limitations
 - [x] Create a deployment user/process if unattended deployment is ever wanted — done 2026-10-07: dedicated `deploy` host user with non-interactive sudo + docker, used for the `d006-v1` release (unattended deployment remains a human decision per release)
-- [ ] Harden/scope the `deploy` user's sudo rights if unattended deployment is retained (currently `NOPASSWD:ALL`)
+- [x] Harden/scope the `deploy` user's sudo rights if unattended deployment is retained — done 2026-10-07: `NOPASSWD:ALL` replaced by a single root-owned entry point `/usr/local/sbin/sokoladas-deploy` (`status`/`release`/`rollback`) with `!setenv`; see `deploy/entrypoint/` and `docs/deployment.md`. Staging a release remains a privileged manual step
 
 **D-002 (first staging deployment) — DONE 2026-09-15 (Ready for review, not Human accepted).** Root task: `../tasks/done/D-002-first-oracle-staging-deployment.md`. Remaining items above are follow-ups, not deployment blockers.
 

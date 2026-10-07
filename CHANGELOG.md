@@ -2,6 +2,36 @@
 
 ## 2026-10-07
 
+### Scoped deployment access — `deploy` unrestricted sudo removed — Ready for review
+
+Replaced `deploy ALL=(ALL) NOPASSWD:ALL` on `sokoladas-demo` with a single
+root-owned entry point.
+
+- `/usr/local/sbin/sokoladas-deploy` (root:root 0755) accepts only `status`,
+  `release <id>` and `rollback <id|previous>`. Sudoers now grants
+  `deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy` with
+  `Defaults:deploy env_reset` and `!setenv` (file
+  `/etc/sudoers.d/90-sokoladas-deploy`, root:root 0440, `visudo -c` OK). Source:
+  [`deploy/entrypoint/`](deploy/entrypoint/README.md).
+- The entry point discards the caller environment, validates the release id and
+  resolved path, requires the whole release tree to be root-owned and not
+  group/other writable, and validates the manifest (only the project's GHCR
+  `smshop-web`/`smshop-api` repositories pinned by immutable `@sha256:`,
+  `linux/arm64`, 40-hex commit).
+- Verified as `deploy`: `sudo -l` lists only the entry point; `sudo whoami`,
+  `sudo bash`, `sudo docker ps`, `sudo systemctl`, `sudo cat /etc/shadow`, direct
+  `docker ps`, `sudo VAR=value …` and malformed release ids/manifests (wrong repo,
+  mutable tag, releaseId mismatch, group/other-writable manifest or config) are
+  all denied; `status` works; `release d006-v1` completed with no container
+  recreation and no pending migrations. `ubuntu` SSH + passwordless sudo
+  unchanged. Previous grant archived at
+  `/root/90-sokoladas-deploy.pre-scoped.bak`.
+- Limitation: re-running `release <id>` for the already-applied id rewrites
+  `previousReleaseId` to that same id (deploy.sh behavior); staging a release
+  directory remains a privileged manual step.
+
+Ready for review, not Human accepted.
+
 ### D-006 release d006-v1 deployed (catalogue + persistent media) — Ready for review
 
 Manifest-driven release `d006-v1` deployed to `sokoladas-demo`, publishing the

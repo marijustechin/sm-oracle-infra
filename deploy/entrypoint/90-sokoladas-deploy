@@ -1,0 +1,11 @@
+# Scoped unattended deployment for the `deploy` account. Replaces the previous
+# unrestricted `deploy ALL=(ALL) NOPASSWD:ALL` grant.
+#
+# Only the reviewed, root-owned entry point /usr/local/sbin/sokoladas-deploy may
+# run as root. It accepts `status`, `release <id>` and `rollback <id|previous>`,
+# validates the release id, directory/file ownership and manifest contents
+# (allowed GHCR repositories, immutable digests, linux/arm64), and discards the
+# caller's environment so compose/env/state paths cannot be redirected.
+Defaults:deploy env_reset
+Defaults:deploy !setenv
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy
