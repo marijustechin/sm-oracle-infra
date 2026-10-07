@@ -1207,10 +1207,34 @@ releases are built on the host by `deploy` without an administrator.
   only the entry point.
 - Lock: a `stage` waited ~8 s for a root-held
   `/opt/sokoladas-staging/state/deploy.lock`, confirming serialization.
-- Limitation: a full stage→release of a new application version was not
-  performed; rollback was verified in isolation (local checks and safe
+- Limitation: rollback was verified in isolation (local checks and safe
   precondition failures) without switching the live application. The staged
   verification release `d006-pipeline-check` remains staged and unapplied.
+
+## d007-v1 authentication UI polish — deployed via the unattended pipeline — verified 2026-10-08 — Ready for review
+
+First ordinary application release published entirely through the unattended
+`stage` → `release` entry point (`deploy`; no administrator staging step).
+
+- Source `smshop` `bff755f`; `Images` run `37687040040`; manifest
+  `deploy/releases/d007-v1.json`.
+- Images (both `linux/arm64`, revision label = `bff755f…`): web
+  `ghcr.io/marijustechin/smshop-web@sha256:80e61b97…`, api
+  `ghcr.io/marijustechin/smshop-api@sha256:401f45c4…`.
+- Applied state `d007-v1` (`previousReleaseId: d006-v1`); evidence
+  `/opt/sokoladas-staging/evidence/20261007T211629Z-d007-v1/` `finalStatus:
+  success`; no pending migrations. Only `api`/`frontend` were recreated with the
+  new digests.
+- Live: apex, branding, `/prisijungti`, `/registracija`, `/pamirsau-slaptazodi`
+  and `/tortai` `200`; `/api/auth/me` `401`; `/media/products/…webp` `200
+  image/webp`; 5 catalogue products and 5 media files unchanged.
+- UI: the served DOM contains the Turnstile wrapper `flex justify-center py-1`
+  and the login anchor's hover/focus utilities; the served CSS contains the
+  chocolate (`#522c1b`) / cream (`#faf7f4`) token utilities. Headless Chromium
+  (desktop and mobile) shows the centered widget and the unchanged default
+  header. Hover and `focus-visible` could not be screenshot-captured (tooling
+  limitation); they are verified by the live DOM classes, served CSS and unit
+  tests.
 
 ## Current unknowns and prerequisites
 

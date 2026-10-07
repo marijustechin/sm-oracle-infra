@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "d007-v1",
+  "createdAt": "2026-10-07T21:16:16Z",
+  "source": {
+    "repository": "github.com/marijustechin/smshop",
+    "commit": "bff755fdfe8f17817c9b0028cd0cb71068997d60",
+    "ref": "main"
+  },
+  "ci": {
+    "imagesRunId": "37687040040"
+  },
+  "images": {
+    "web": {
+      "ref": "ghcr.io/marijustechin/smshop-web@sha256:80e61b97c290a470a9e03fef39458466cf98b22815dd2cd743859aa99f79f677",
+      "platform": "linux/arm64",
+      "tag": "sha-bff755fdfe8f17817c9b0028cd0cb71068997d60"
+    },
+    "api": {
+      "ref": "ghcr.io/marijustechin/smshop-api@sha256:401f45c48aba949446099f93d2f653d1498f8fdae1019e280ee8267530a6a64f",
+      "platform": "linux/arm64",
+      "tag": "sha-bff755fdfe8f17817c9b0028cd0cb71068997d60"
+    }
+  },
+  "infra": {
+    "contractCommit": "602926fa2fdd50badbd08b11c078a920e463e854"
+  },
+  "notes": "A-013 authentication UI polish: shared Turnstile widget centered with balanced vertical spacing; header Prisijungti action uses the chocolate/cream hover and focus-visible treatment. Source bff755f, Images run 37687040040."
+}

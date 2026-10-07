@@ -1,5 +1,44 @@
 # Infrastructure Change Log
 
+## 2026-10-08
+
+### d007-v1 — authentication UI polish deployed via the unattended pipeline — Ready for review
+
+First application release published through the unattended `stage` → `release`
+entry point, with no administrator staging step.
+
+- Source `smshop` `bff755f` (A-013: the shared Turnstile widget is centered with
+  balanced vertical spacing; the header `Prisijungti` action uses the
+  chocolate/cream hover and `focus-visible` treatment). `Images` run
+  `37687040040`.
+- Immutable digests (both `linux/arm64`; the image revision label equals
+  `bff755f…`): web
+  `ghcr.io/marijustechin/smshop-web@sha256:80e61b97c290a470a9e03fef39458466cf98b22815dd2cd743859aa99f79f677`,
+  api
+  `ghcr.io/marijustechin/smshop-api@sha256:401f45c48aba949446099f93d2f653d1498f8fdae1019e280ee8267530a6a64f`.
+- Manifest `deploy/releases/d007-v1.json`; staged by `deploy` from stdin
+  (`stage d007-v1`), then `release d007-v1`. Applied state `d007-v1`
+  (`previousReleaseId: d006-v1`); evidence
+  `/opt/sokoladas-staging/evidence/20261007T211629Z-d007-v1/` `finalStatus:
+  success`.
+- Migrations: no pending. Catalogue (5 products) and media (5 files) unchanged;
+  only `api` and `frontend` were recreated with the new digests (proxy/certbot
+  restarted per the standard release sequence).
+- Live checks: apex, branding, `/prisijungti`, `/registracija`,
+  `/pamirsau-slaptazodi`, `/tortai` `200`; unauthenticated `/api/auth/me` `401`;
+  `/media/products/…webp` `200 image/webp`. The served DOM contains the
+  Turnstile wrapper `flex justify-center py-1` and the login anchor's
+  `hover:bg-primary hover:text-on-primary focus-visible:bg-primary
+  focus-visible:text-on-primary`; the served CSS contains the chocolate
+  (`#522c1b`) / cream (`#faf7f4`) token utilities.
+- Visual: headless Chromium (desktop and mobile) confirms the centered Turnstile
+  widget and the unchanged default header/`Prisijungti` action. Hover and
+  `focus-visible` pseudo-classes could not be captured by the available headless
+  screenshot tooling; they are verified by the live DOM classes, the served CSS
+  and the unit tests.
+
+Ready for review, not Human accepted.
+
 ## 2026-10-07
 
 ### Unattended release staging through the `deploy` entry point — Ready for review
