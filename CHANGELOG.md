@@ -2,11 +2,10 @@
 
 ## 2026-10-08
 
-### Encrypted Google Drive backups (BACKUP-001) — implemented; Google authorization pending — Ready for review
+### Encrypted Google Drive backups (BACKUP-001) — deployed and verified — Ready for review
 
-Implemented automatic, encrypted off-server backups and an isolated restore
-verifier. Live install is done except the one-time Google authorization; no real
-backup has been uploaded yet and no restore test has run.
+Encrypted off-server backups to Google Drive and an isolated restore verifier
+are implemented, installed, authorized and verified end to end.
 
 - `backup/sokoladas-backup.sh`: consistent `pg_dump -Fc`, media archive,
   config/host-secret archive (incl. the applied release manifest), metadata and
@@ -28,9 +27,32 @@ backup has been uploaded yet and no restore test has run.
   password/salt generated, recovery bundle copied off-server. The `deploy`
   account's permissions are unchanged.
 
-Pending: the one-time Google Drive authorization
-(`odisejas.laertas@gmail.com`), the first real off-server backup, the restore
-test, and enabling `sokoladas-backup.timer`. Procedure: `docs/backups.md`.
+Live verification (2026-10-08):
+
+- Google authorization completed for `odisejas.laertas@gmail.com` (token
+  installed via stdin from `rclone authorize`, never printed or logged). The
+  destination folder identity was verified before pinning: exactly one
+  `atsargines-kopijos/sokoladas` folder (`root_folder_id
+  1cHz13zFh1bvkfzCrEPCYN1-TkrKAdcmG`); no duplicate was created. The remote uses
+  `scope = drive` (full Drive; `drive.file` cannot see the pre-existing folder).
+- First off-server backup set `2026-10-08T050351Z`: `db.dump` 38 KB,
+  `media.tar.gz` 422 KB, `config.tar.gz` 5.3 KB; uploaded, then re-downloaded and
+  checksum-verified, with a `COMPLETE` marker; nothing was pruned (no old sets).
+- Downloaded restore test passed: the set was fetched from Drive, decrypted,
+  restored into an isolated `--network none` PostgreSQL 18 container
+  (`pg_restore --no-owner --no-privileges`), and the restored counts matched the
+  backup metadata (4 users, 5 catalogue products, 9 tags, 5 ratings, 5 media
+  references) with all referenced media present. Evidence retained under
+  `/opt/sokoladas-staging/backup/restore-evidence/`; only the throwaway
+  container and temporary extraction dirs were removed.
+- Failure notification exercised through the existing Resend channel
+  (`NOTIFY_TO=odisejas.laertas@gmail.com`): delivered.
+- `sokoladas-backup.timer` is enabled and active; next run
+  `2026-10-09 03:00:59 EEST`.
+- Recovery material (crypt password/salt) kept off-server at
+  `~/sokoladas-backup-recovery/` on the operator's machine; the plaintext copy
+  was removed from the server and the OAuth token is excluded from backup
+  archives.
 
 Ready for review, not Human accepted.
 

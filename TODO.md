@@ -36,8 +36,8 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 Resolve applicable backup needs before introducing valuable persistent data. Demo status does not establish disposability.
 
 Implementation is in [`backup/`](backup/) with the design and runbooks in
-[docs/backups.md](docs/backups.md). Google authorization is pending; a real
-off-server backup and the isolated restore test follow it.
+[docs/backups.md](docs/backups.md). Google authorization, the first off-server
+backup and the isolated restore test are complete; the daily timer is enabled.
 
 - [x] Decide which data can be recreated and which must be backed up — the database, uploaded media and host secrets/config (incl. the applied release manifest) are backed up; image layers, caches and `pg_data` raw files are not
 - [x] Choose backup destination and cadence — Google Drive `atsargines-kopijos/sokoladas` via an rclone `crypt` remote, daily ~03:00 `Europe/Vilnius` (systemd timer)
@@ -45,7 +45,7 @@ off-server backup and the isolated restore test follow it.
 - [x] Define media/uploads backup strategy — `media.tar.gz` of `sokoladas-staging_media_data`; the set fails if a database-referenced media file is missing
 - [x] Store backups outside Oracle VM — client-side encrypted (rclone `crypt`) before upload to Drive
 - [x] Define retention policy — latest 7 successful daily sets + 4 weekly sets; incomplete sets never deleted; deletion limited to `sokoladas-backups/sets/`
-- [ ] Test restore procedure — pending Google authorization and the first off-server backup (`sokoladas-restore-verify run <set>`)
+- [x] Test restore procedure — verified 2026-10-08 against the uploaded set `2026-10-08T050351Z` with `sokoladas-restore-verify run` (isolated `--network none` restore; counts and referenced media matched; evidence under `backup/restore-evidence/`)
 
 
 ## 9. Monitoring and maintenance

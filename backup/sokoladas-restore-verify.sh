@@ -40,9 +40,11 @@ rclone() { command "$RCLONE_BIN" --config "$RCLONE_CONFIG" "$@"; }
 # Cleanup state is global so the EXIT trap remains valid after verify_set returns.
 RESTORE_CONTAINER=""
 RESTORE_WORK=""
+RESTORE_FETCH=""
 cleanup() {
   [[ -n "$RESTORE_CONTAINER" ]] && docker rm -f "$RESTORE_CONTAINER" >/dev/null 2>&1 || true
   [[ -n "$RESTORE_WORK" ]] && rm -rf "$RESTORE_WORK" || true
+  [[ -n "$RESTORE_FETCH" ]] && rm -rf "$RESTORE_FETCH" || true
 }
 
 COUNTS_SQL="select json_build_object(
@@ -57,7 +59,8 @@ COUNTS_SQL="select json_build_object(
   'media_referenced', (select count(distinct \"primaryImageUrl\") from catalog_products where \"primaryImageUrl\" like '/media/products/%'))"
 
 fetch_set() {
-  local name="$1" dest="$WORK_ROOT/$name"
+  local name="$1"
+  local dest="$WORK_ROOT/$name"
   rm -rf "$dest"; mkdir -p "$dest"
   [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z$ ]] || die "invalid set name: $name"
   rclone lsf "$REMOTE/$SET_PREFIX/$name/COMPLETE" >/dev/null 2>&1 || die "set is not complete: $name"
@@ -149,8 +152,8 @@ main() {
     run)
       [[ $# -eq 2 ]] || die "usage: run <set-name>"
       require_tools; mkdir -p "$WORK_ROOT" "$EVIDENCE_ROOT"
-      local dir; dir="$(fetch_set "$2")"
-      verify_set "$dir"
+      RESTORE_FETCH="$(fetch_set "$2")"
+      verify_set "$RESTORE_FETCH"
       ;;
     verify)
       [[ $# -eq 2 ]] || die "usage: verify <local-dir>"
