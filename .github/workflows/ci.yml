@@ -29,3 +29,18 @@ jobs:
           node scripts/ci/check-workflow.mjs all --base "$BASE" --head "${{ github.sha }}"
       - name: Workflow checker fixture tests
         run: node --test scripts/ci/check-workflow.test.mjs
+
+  tests:
+    name: Infra tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install rclone
+        run: sudo apt-get update && sudo apt-get install -y rclone
+      - name: Infrastructure test gate
+        run: bash scripts/tests/run-all.sh

@@ -2,6 +2,20 @@
 
 ## 2026-10-08
 
+### Infra test gate (H-014) — Ready for review
+
+Added an authoritative aggregate test gate and wired it into CI:
+
+- `scripts/tests/run-all.sh` runs the deployment, entry-point, staging, backup,
+  release-manifest resolver and workflow-checker fixture suites, declares its
+  runtime prerequisites (bash, python3, node, rclone, docker, git, flock, tar,
+  sha256sum, mktemp) and fails if any is missing — suites are never silently
+  skipped. Any suite failure exits nonzero.
+- `.github/workflows/ci.yml`: new `Infra tests` job runs the same command
+  (rclone installed); the existing `Workflow checks` job is unchanged.
+
+Ready for review, not Human accepted.
+
 ### CI release gate (H-012) — Ready for review
 
 Merged image publication into a single application workflow so images are
