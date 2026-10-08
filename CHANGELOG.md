@@ -2,6 +2,25 @@
 
 ## 2026-10-08
 
+### Mechanical workflow checks (H-011) — Ready for review
+
+Added dependency-free workflow checks and CI, alongside the application
+repository:
+
+- `scripts/ci/check-workflow.mjs` (`commits`, `tasks`, `links`, `all`) and
+  `scripts/ci/check-workflow.test.mjs` (13 fixture tests); identical copies live
+  in `smshop`.
+- `.github/workflows/ci.yml` runs the checks over the push/PR range and runs the
+  fixture tests.
+- Policy, accepted commit formats, exemptions and parser scope are documented in
+  `AGENTS.md` section 10 and `smshop/docs/task-workflow.md`.
+- Also fixed three pre-existing broken local links found by the checker:
+  `TODO.md` (`d-007-v1` → `d007-v1` anchor) and two `docs/deployment.md`
+  relative links (`../deploy/catalog-import/README.md`,
+  `../deploy/entrypoint/README.md`).
+
+Ready for review, not Human accepted.
+
 ### Encrypted Google Drive backups (BACKUP-001) — deployed and verified — Ready for review
 
 Encrypted off-server backups to Google Drive and an isolated restore verifier

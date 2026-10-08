@@ -225,6 +225,21 @@ Before considering work ready:
 
 Do not commit automatically unless the task explicitly asks for a commit.
 
+Commit subjects must carry a task ID in one of two exact formats —
+`<TASK-ID>: <summary>` or `<type>(<scope>): <summary> (<TASK-ID>)` — with merge,
+revert and bot-identity exemptions only. The policy is identical to
+`smshop/docs/task-workflow.md`; `BACKUP-001`, `D-007` and similar uppercase
+hyphenated identifiers are valid. The mechanical workflow checks run locally:
+
+```sh
+node scripts/ci/check-workflow.mjs all --base <before> --head <sha>
+node --test scripts/ci/check-workflow.test.mjs
+```
+
+CI runs both over the push/PR range. This repository has no `tasks/done/`
+directory, so the task-record check reports "not applicable" (infrastructure work
+uses the root workspace task files).
+
 ## 11. Reviewability
 
 Write infrastructure code for a human reviewer.

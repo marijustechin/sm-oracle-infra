@@ -170,7 +170,7 @@ container replacement and redeploys.
 - The volume is not touched by `rollback` (which recreates only `frontend`/`api`)
   or by any destructive command; `deploy.sh` contains no volume-deletion command.
 - Catalogue content is imported after deployment with
-  [`deploy/catalog-import/`](catalog-import/README.md) (idempotent, slug-keyed);
+  [`deploy/catalog-import/`](../deploy/catalog-import/README.md) (idempotent, slug-keyed);
   media files are copied into the volume with UID 10001 ownership.
 
 ## Scoped unattended deployment access (2026-10-07, extended 2026-10-07)
@@ -179,7 +179,7 @@ The `deploy` host account no longer has `NOPASSWD:ALL`. It may run only the
 root-owned entry point `/usr/local/sbin/sokoladas-deploy`
 (`deploy ALL=(root) NOPASSWD: /usr/local/sbin/sokoladas-deploy`), which supports
 `status`, `stage <id>`, `release <id>` and `rollback <id|previous>`. The source
-and install steps live in [`deploy/entrypoint/`](entrypoint/README.md).
+and install steps live in [`deploy/entrypoint/`](../deploy/entrypoint/README.md).
 
 - The entry point discards the caller environment (`env -i`; `Defaults:deploy
   !setenv`), validates the release id and resolved path, requires the whole
