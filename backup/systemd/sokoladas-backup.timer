@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily encrypted off-server backup for sokoladas-demo
+
+[Timer]
+# ~03:00 Europe/Vilnius. Persistent catches up a run missed while powered off.
+OnCalendar=*-*-* 03:00:00 Europe/Vilnius
+RandomizedDelaySec=300
+Persistent=true
+Unit=sokoladas-backup.service
+
+[Install]
+WantedBy=timers.target

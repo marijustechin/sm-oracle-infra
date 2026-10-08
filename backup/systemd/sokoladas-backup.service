@@ -1,0 +1,16 @@
+[Unit]
+Description=Encrypted off-server backup for sokoladas-demo
+Documentation=file:/opt/sokoladas-staging/backup/README.md
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sokoladas-backup run
+# The script coordinates with deployment via the shared deploy lock and never
+# touches the live database or media volume beyond a consistent read.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=3600

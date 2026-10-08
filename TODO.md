@@ -35,13 +35,18 @@ The [application deployment contract](docs/application-deployment-contract.md) i
 
 Resolve applicable backup needs before introducing valuable persistent data. Demo status does not establish disposability.
 
-- [ ] Decide which data can be recreated and which must be backed up
-- [ ] Choose backup destination and cadence
-- [ ] Define PostgreSQL backup strategy
-- [ ] Define media/uploads backup strategy — progress 2026-10-07 (D-006): product media now persists in `sokoladas-staging_media_data`; a pre-deploy `pg_dump -Fc` was retrieved to the development machine. No off-host destination, cadence or media-backup schedule exists yet
-- [ ] Store backups outside Oracle VM
-- [ ] Define retention policy
-- [ ] Test restore procedure
+Implementation is in [`backup/`](backup/) with the design and runbooks in
+[docs/backups.md](docs/backups.md). Google authorization is pending; a real
+off-server backup and the isolated restore test follow it.
+
+- [x] Decide which data can be recreated and which must be backed up — the database, uploaded media and host secrets/config (incl. the applied release manifest) are backed up; image layers, caches and `pg_data` raw files are not
+- [x] Choose backup destination and cadence — Google Drive `atsargines-kopijos/sokoladas` via an rclone `crypt` remote, daily ~03:00 `Europe/Vilnius` (systemd timer)
+- [x] Define PostgreSQL backup strategy — consistent `pg_dump -Fc` logical dump, verified in the set
+- [x] Define media/uploads backup strategy — `media.tar.gz` of `sokoladas-staging_media_data`; the set fails if a database-referenced media file is missing
+- [x] Store backups outside Oracle VM — client-side encrypted (rclone `crypt`) before upload to Drive
+- [x] Define retention policy — latest 7 successful daily sets + 4 weekly sets; incomplete sets never deleted; deletion limited to `sokoladas-backups/sets/`
+- [ ] Test restore procedure — pending Google authorization and the first off-server backup (`sokoladas-restore-verify run <set>`)
+
 
 ## 9. Monitoring and maintenance
 

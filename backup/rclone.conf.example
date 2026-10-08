@@ -1,0 +1,28 @@
+# Example rclone configuration for sokoladas-demo backups (NO SECRETS).
+#
+# The real file is installed root-owned at
+# /etc/sokoladas-staging/backup/rclone.conf (mode 0600) and is never committed.
+# It holds the Google OAuth token and the crypt password/salt and must be kept
+# with the off-server recovery bundle (see docs/backups.md).
+
+[gdrive]
+type = drive
+# Full Drive scope: Google's drive.file scope cannot see a pre-existing folder
+# that this app did not create, so it cannot be used for the existing
+# atsargines-kopijos/sokoladas destination. root_folder_id below restricts where
+# rclone operates, but does NOT narrow the token's permission — see docs/backups.md.
+scope = drive
+# Pinned destination folder id (set with: sokoladas-backup resolve-folder).
+root_folder_id =
+# Google OAuth token (set with: sokoladas-backup set-token < token.json).
+token = {}
+
+[crypt]
+type = crypt
+remote = gdrive:
+filename_encryption = standard
+directory_name_encryption = true
+# Obscured crypt password and salt. The plaintext equivalents are kept only in
+# the off-server recovery bundle.
+password = <obscured password>
+password2 = <obscured salt>

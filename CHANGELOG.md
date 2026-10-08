@@ -2,6 +2,38 @@
 
 ## 2026-10-08
 
+### Encrypted Google Drive backups (BACKUP-001) — implemented; Google authorization pending — Ready for review
+
+Implemented automatic, encrypted off-server backups and an isolated restore
+verifier. Live install is done except the one-time Google authorization; no real
+backup has been uploaded yet and no restore test has run.
+
+- `backup/sokoladas-backup.sh`: consistent `pg_dump -Fc`, media archive,
+  config/host-secret archive (incl. the applied release manifest), metadata and
+  a completion marker; uploads via an rclone `crypt` remote (client-side
+  encryption), re-downloads and checksum-verifies before marking success, then
+  prunes by the retention policy. Coordinates with `stage`/`release`/`rollback`
+  via the shared deploy lock; an exclusive run lock prevents overlap; failures
+  keep the last good set and are notified via the existing Resend channel.
+- `backup/sokoladas-restore-verify.sh`: downloads/decrypts a set and restores it
+  into a throwaway PostgreSQL container on `--network none`, comparing row
+  counts and referenced media against the set's own `metadata.json`.
+- `backup/install-backup.sh`, `backup/systemd/*`, `backup/backup.env.example`,
+  `backup/rclone.conf.example`: installer, daily ~03:00 `Europe/Vilnius` timer
+  (`Persistent=true`), retention 7 daily + 4 weekly.
+- Tests `scripts/tests/test_backup.sh` (19 checks, incl. a real local rclone
+  crypt round-trip, retention safety and media/metadata checks) pass.
+- Installed on `sokoladas-demo`: rclone, scripts under `/usr/local/sbin/`,
+  config under `/etc/sokoladas-staging/backup/` (root, 0600), crypt
+  password/salt generated, recovery bundle copied off-server. The `deploy`
+  account's permissions are unchanged.
+
+Pending: the one-time Google Drive authorization
+(`odisejas.laertas@gmail.com`), the first real off-server backup, the restore
+test, and enabling `sokoladas-backup.timer`. Procedure: `docs/backups.md`.
+
+Ready for review, not Human accepted.
+
 ### d007-v1 — authentication UI polish deployed via the unattended pipeline — Ready for review
 
 First application release published through the unattended `stage` → `release`
