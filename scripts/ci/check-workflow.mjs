@@ -279,7 +279,10 @@ function git(root, args) {
 
 function tryGit(root, args) {
   try {
-    return git(root, args);
+    return execFileSync('git', ['-C', root, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
     return null;
   }
