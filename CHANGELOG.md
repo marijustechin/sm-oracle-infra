@@ -2,6 +2,29 @@
 
 ## 2026-10-08
 
+### Automatic staging deployment (H-015) — implementation Ready for review; activation pending
+
+The application CI now deploys verified `main` releases to staging through the
+existing restricted entry point (no new mechanism):
+
+- `smshop` `.github/workflows/ci.yml`: a `changes` job (documentation-only
+  detection) and a `deploy` job gated on `workflow`/`verify`/`build`/`release`;
+  trusted events only (push to `main` or explicit `workflow_dispatch`), PRs
+  excluded. It reuses the run's release manifest via stdin, rejects stale runs,
+  pins the host key, serializes with `concurrency` + the server lock and verifies
+  live health.
+- A dedicated least-privilege SSH key was installed on the `deploy` account
+  (`no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty`) and verified
+  against the entry point; deploy sudo restrictions are unchanged.
+- Contract/boundary updated: CI may deploy to staging through the entry point; a
+  future production environment keeps a separate approval boundary
+  (`docs/application-deployment-contract.md`, `docs/deployment.md`).
+
+Pending: the `staging` GitHub Environment secret `DEPLOY_SSH_KEY`, then a live
+verified run.
+
+Ready for review, not Human accepted.
+
 ### Infra test gate (H-014) — Ready for review
 
 Added an authoritative aggregate test gate and wired it into CI:

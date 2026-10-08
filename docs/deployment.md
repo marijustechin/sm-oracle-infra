@@ -213,6 +213,14 @@ ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy status'
 ssh deploy@sokoladas.eu 'sudo -n /usr/local/sbin/sokoladas-deploy rollback previous'
 ```
 
+Since 2026-10-08 (H-015) the application CI also invokes this entry point for
+automatic staging deployment: after its required checks and image publication
+succeed, the `smshop` workflow stages the release manifest produced by the same
+run (stdin) and runs `release`/`status` as the `deploy` account, using a dedicated
+least-privilege SSH key held in the GitHub `staging` environment. The server-side
+lock and this entry point are unchanged; see `smshop/docs/deployment.md` and
+`docs/application-deployment-contract.md`.
+
 A release staged before a `deploy.sh` fix is repaired in place with the narrowly
 scoped administrator tool, which replaces only `deploy.sh` and verifies nothing
 else changes:

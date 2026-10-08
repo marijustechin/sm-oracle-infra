@@ -155,8 +155,18 @@ assembling the URL inside Compose; keep the existing `db_*` init secrets.
 Boundary rules:
 
 - The infrastructure does not access or modify application source and does not write application code.
-- Application CI **builds and publishes** images, but does **not** receive production SSH credentials and does **not** automatically deploy to the Oracle host in the initial model.
-- Deployment to the Oracle host is a deliberate, reviewed action performed from the infrastructure side against digest-pinned images.
+- Application CI **builds and publishes** images; since 2026-10-08 (H-015) it
+  also **automatically deploys** verified `main` releases to staging through the
+  infrastructure-owned, restricted entry point
+  `/usr/local/sbin/sokoladas-deploy` (`stage`/`release`/`status`), using a
+  dedicated least-privilege SSH key held in the `staging` GitHub Environment. It
+  never deploys pull requests, non-`main` refs, documentation-only changes, or
+  releases with failed/cancelled/skipped required checks, and cannot choose
+  arbitrary manifests or image repositories. It receives no production SSH
+  credentials.
+- Deployment to the Oracle host remains against digest-pinned images and is
+  bounded by the infrastructure-owned entry point; a destructive or
+  incompatible schema change still needs the reviewed repair/restore path.
 - The application never publishes its own host ports; only the infrastructure-owned proxy publishes 80/443.
 
 This file is the **single authoritative deployment contract**. The application
