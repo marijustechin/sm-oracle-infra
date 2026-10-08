@@ -2,7 +2,7 @@
 
 ## 2026-10-08
 
-### Automatic staging deployment (H-015) — implementation Ready for review; activation pending
+### Automatic staging deployment (H-015) — verified — Ready for review
 
 The application CI now deploys verified `main` releases to staging through the
 existing restricted entry point (no new mechanism):
@@ -12,16 +12,18 @@ existing restricted entry point (no new mechanism):
   trusted events only (push to `main` or explicit `workflow_dispatch`), PRs
   excluded. It reuses the run's release manifest via stdin, rejects stale runs,
   pins the host key, serializes with `concurrency` + the server lock and verifies
-  live health.
+  live health. A missing `DEPLOY_SSH_KEY` now fails the job; docs-only and
+  stale-run skips are preserved.
 - A dedicated least-privilege SSH key was installed on the `deploy` account
-  (`no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty`) and verified
-  against the entry point; deploy sudo restrictions are unchanged.
-- Contract/boundary updated: CI may deploy to staging through the entry point; a
-  future production environment keeps a separate approval boundary
-  (`docs/application-deployment-contract.md`, `docs/deployment.md`).
+  (`no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty`); deploy sudo
+  restrictions are unchanged.
+- Contract/boundary updated (`docs/application-deployment-contract.md`,
+  `docs/deployment.md`).
 
-Pending: the `staging` GitHub Environment secret `DEPLOY_SSH_KEY`, then a live
-verified run.
+Verified live by `smshop` run `37840767185` (source `02a62de`): the `deploy` job
+executed stage/release/status/health; applied release `ci-02a62de6e3b7`
+(previous `d007-v1`; web `sha256:ddd3a6a5…`, api `sha256:5b0a3f70…`); evidence
+`20261008T204746Z-ci-02a62de6e3b7` `finalStatus: success`.
 
 Ready for review, not Human accepted.
 
