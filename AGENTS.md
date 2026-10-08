@@ -163,6 +163,34 @@ Failed or incomplete work remains unfinished; do not log it as completed. Read-o
 
 Preserve historical entries. Correct factual errors or add clearly dated evidence qualifications without inventing missing evidence or rewriting historical reports as new observations.
 
+### State reconciliation (completion requirement)
+
+Before marking any task complete — including documentation-only and operational
+tasks — reconcile the final implementation and verification results with the
+owning task record, the relevant `TODO`, and the applicable current-state
+documentation (`README.md`, `docs/application-deployment-contract.md`,
+`docs/deployment.md`, `docs/server.md`, `docs/backups.md`, and
+`docs/architecture.md`/`docs/configuration.md` where present):
+
+- update every affected document;
+- for an applicable document that needs no change, state briefly why no update is
+  needed;
+- resolve contradictions before completion;
+- preserve historical records and never claim verification that was not performed.
+
+For operational tasks, distinguish **repository implementation**, **installed
+server state**, and **actual verification**: a merged change is not installed
+state, and neither is verified until it has been checked and recorded.
+
+The completion report ends with:
+
+```text
+State reconciliation: updated <documents>; <other applicable documents> unaffected because <reason>.
+```
+
+This mirrors the root `AGENTS.md` rule and the `smshop/AGENTS.md` rule for
+application tasks; keep the wording identical.
+
 ## 9. Commands and Destructive Operations
 
 Before a destructive or potentially access-breaking action, verify its necessity and scope and obtain explicit human approval as defined in section 1.
@@ -225,6 +253,8 @@ A change task is Ready for review only when all of the following are true:
 - no known relevant errors remain hidden;
 - documentation reflects the new state;
 - TODO/change-log state is updated when applicable;
+- state reconciliation is complete (section 8): affected documents updated, and
+  any applicable document left unchanged stated with a reason;
 - the diff is understandable and reviewable;
 - no secrets or private material were introduced.
 
