@@ -221,7 +221,35 @@ test('CLI commits: fails a bad subject, passes a good one, handles a missing bas
     dir,
   );
   assert.equal(tip.code, 0);
-  assert.match(tip.out, /baseline unavailable/);
+  assert.match(tip.out, /zero baseline/);
+});
+
+test('CLI commits: an explicit non-zero unavailable baseline FAILS (no tip fallback)', () => {
+  const { dir } = initRepo();
+  commit(dir, 'A-001: init');
+  const res = runCli(
+    [
+      'commits',
+      '--root',
+      dir,
+      '--base',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      '--head',
+      'HEAD',
+    ],
+    dir,
+  );
+  assert.equal(res.code, 1);
+  assert.match(res.out, /baseline is unavailable/);
+});
+
+test('CLI links: local mode checks uncommitted working-tree files', () => {
+  const { dir } = initRepo();
+  commit(dir, 'A-001: init');
+  writeFileSync(join(dir, 'newdoc.md'), '[bad](missing-local.md)\n'); // untracked, not committed
+  const res = runCli(['links', '--root', dir], dir); // no --base => local tip + working tree
+  assert.equal(res.code, 1);
+  assert.match(res.out, /broken local link/);
 });
 
 test('CLI tasks: fails a changed record missing sections', () => {

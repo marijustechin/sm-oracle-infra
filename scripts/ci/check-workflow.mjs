@@ -288,20 +288,30 @@ function tryGit(root, args) {
 function resolveRange(root, base, head) {
   const h = head || tryGit(root, ['rev-parse', 'HEAD']);
   if (!h) throw new Error('cannot resolve HEAD');
-  const baseUsable =
-    base &&
-    !/^0+$/.test(base) &&
-    tryGit(root, ['rev-parse', '--verify', `${base}^{commit}`]) !== null;
-  return { base: baseUsable ? base : null, head: h };
+  if (base === undefined || base === null || base === '') {
+    // No baseline supplied (local invocation): tip commit + working tree.
+    return { mode: 'local', base: null, head: h };
+  }
+  if (/^0+$/.test(String(base))) {
+    // New branch / first push: the full new-branch range is unavailable, so define
+    // an explicit, bounded fallback (tip commit only) instead of the whole history.
+    return { mode: 'tip', base: null, head: h, note: 'zero baseline (new branch/first push)' };
+  }
+  if (tryGit(root, ['rev-parse', '--verify', `${base}^{commit}`]) === null) {
+    // An explicitly supplied, non-zero baseline that cannot be resolved is a hard
+    // failure — never a silent fallback to the tip.
+    throw new Error(`explicit baseline is unavailable in this clone: ${base}`);
+  }
+  return { mode: 'range', base, head: h };
 }
 
-function commitRecords(root, base, head) {
+function commitRecords(root, range) {
   const fmt = '%H%x1f%s%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%P';
   const out = git(
     root,
-    base
-      ? ['log', `--format=${fmt}`, `${base}..${head}`]
-      : ['log', `--format=${fmt}`, '-n', '1', head],
+    range.mode === 'range'
+      ? ['log', `--format=${fmt}`, `${range.base}..${range.head}`]
+      : ['log', `--format=${fmt}`, '-n', '1', range.head],
   );
   if (!out) return [];
   return out.split('\n').map((line) => {
@@ -311,14 +321,38 @@ function commitRecords(root, base, head) {
   });
 }
 
-function changedFiles(root, base, head, filter = 'ACM') {
-  if (base) {
-    const out = git(root, ['diff', '--name-only', `--diff-filter=${filter}`, `${base}..${head}`]);
+function workingTreeFiles(root) {
+  const tracked = tryGit(root, ['diff', '--name-only', 'HEAD']) || '';
+  const untracked = tryGit(root, ['ls-files', '--others', '--exclude-standard']) || '';
+  return [...new Set([...tracked.split('\n'), ...untracked.split('\n')].filter(Boolean))];
+}
+
+function changedFiles(root, range, filter = 'ACM') {
+  if (range.mode === 'range') {
+    const out = git(root, [
+      'diff',
+      '--name-only',
+      `--diff-filter=${filter}`,
+      `${range.base}..${range.head}`,
+    ]);
     return out ? out.split('\n').filter(Boolean) : [];
   }
   const out =
-    tryGit(root, ['diff-tree', '--no-commit-id', '--name-only', '-r', '--root', head]) || '';
-  return out.split('\n').filter(Boolean);
+    tryGit(root, ['diff-tree', '--no-commit-id', '--name-only', '-r', '--root', range.head]) || '';
+  const tip = out.split('\n').filter(Boolean);
+  if (range.mode === 'local') return [...new Set([...tip, ...workingTreeFiles(root)])];
+  return tip;
+}
+
+function rangeNotice(scope, range) {
+  if (range.mode === 'range') return;
+  if (range.mode === 'tip') {
+    console.log(
+      `[${scope}] ${range.note}; checking the tip commit only (${range.head.slice(0, 12)}).`,
+    );
+  } else {
+    console.log(`[${scope}] no --base supplied; checking the tip commit and working tree only.`);
+  }
 }
 
 function parseArgs(argv) {
@@ -336,13 +370,15 @@ function parseArgs(argv) {
 }
 
 function cmdCommits(root, args) {
-  const { base, head } = resolveRange(root, args.base, args.head);
-  if (!base) {
-    console.log(
-      `[commits] baseline unavailable (no usable --base); validating the tip commit only (${head.slice(0, 12)}).`,
-    );
+  let range;
+  try {
+    range = resolveRange(root, args.base, args.head);
+  } catch (error) {
+    console.error(`[commits] ${error.message}`);
+    return 1;
   }
-  const commits = commitRecords(root, base, head);
+  rangeNotice('commits', range);
+  const commits = commitRecords(root, range);
   if (commits.length === 0) {
     console.log('[commits] no commits in the checked range; nothing to validate.');
     return 0;
@@ -385,16 +421,19 @@ function cmdTasks(root, args) {
   if (args.all) {
     files = listMarkdownFiles(doneDir);
   } else {
-    const { base, head } = resolveRange(root, args.base, args.head);
+    let range;
+    try {
+      range = resolveRange(root, args.base, args.head);
+    } catch (error) {
+      console.error(`[tasks] ${error.message}`);
+      return 1;
+    }
+    rangeNotice('tasks', range);
     const rel = relative(root, doneDir).split(sep).join('/');
-    files = changedFiles(root, base, head)
+    files = changedFiles(root, range)
       .filter((f) => f === `${rel}/` || f.startsWith(`${rel}/`) || f === rel)
       .map((f) => join(root, f))
       .filter((f) => f.endsWith('.md') && existsSync(f));
-    if (!base)
-      console.log(
-        `[tasks] baseline unavailable; checking task records changed by the tip commit only.`,
-      );
   }
   const failures = [];
   for (const file of files) {
@@ -429,10 +468,15 @@ function cmdLinks(root, args) {
     if (informational)
       console.log('[links] full-repository scan (report-only; use --strict to fail).');
   } else {
-    const { base, head } = resolveRange(root, args.base, args.head);
-    if (!base)
-      console.log('[links] baseline unavailable; checking files changed by the tip commit only.');
-    files = changedFiles(root, base, head)
+    let range;
+    try {
+      range = resolveRange(root, args.base, args.head);
+    } catch (error) {
+      console.error(`[links] ${error.message}`);
+      return 1;
+    }
+    rangeNotice('links', range);
+    files = changedFiles(root, range)
       .map((f) => join(root, f))
       .filter((f) => f.endsWith('.md') && existsSync(f));
   }
@@ -494,6 +538,9 @@ function main(argv) {
     default:
       console.error(
         'usage: check-workflow.mjs <commits|tasks|links|all> [--base <sha>] [--head <sha>] [--root <dir>] [--all] [--strict] [--require "A,B,C"]',
+      );
+      console.error(
+        '  --base: an explicit non-zero baseline that is unavailable makes the check FAIL; a zero baseline (new branch) checks the tip only; omit it for local tip + working-tree checks.',
       );
       return 2;
   }

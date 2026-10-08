@@ -2,6 +2,24 @@
 
 ## 2026-10-08
 
+### CI release gate (H-012) — Ready for review
+
+Merged image publication into a single application workflow so images are
+published to GHCR only after the required checks pass for the exact commit:
+
+- `.github/workflows/ci.yml`: `build` (`needs: [workflow, verify]`, trusted
+  events only, `packages: write` scoped to it, checks out `${{ github.sha }}`)
+  and `release` (`needs: [build]`). Image repositories, SHA tags, revision
+  labels, immutable digests, `linux/arm64` and the Turnstile build argument are
+  unchanged.
+- The independent `.github/workflows/images.yml` was removed so it cannot bypass
+  the gate; the build-config test now asserts the gate.
+- Checker baseline policy: an explicit non-zero baseline that is unavailable now
+  fails; a zero baseline checks the tip only; local runs cover tip + working tree
+  (`scripts/ci/check-workflow.mjs` in both repositories, 15 fixture tests).
+
+Ready for review, not Human accepted.
+
 ### Mechanical workflow checks (H-011) — Ready for review
 
 Added dependency-free workflow checks and CI, alongside the application
