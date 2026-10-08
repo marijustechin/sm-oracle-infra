@@ -1,6 +1,6 @@
 # Section 7 — Application deployment contract and image delivery
 
-**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-09-22: D-004 and the configuration-only D-005 are deployed and verified; the current applied release is `d006-v1` (catalogue + persistent media; see [deployment.md](deployment.md#d-006-verification-status-2026-10-07)).** No live change is authorized by this document itself.
+**2026-09-09 — Ready for review (design + infra foundation).** **2026-09-15: the contract has been implemented and the first staging deployment is live and verified (D-002; see [server.md](server.md#d-002-first-staging-deployment-verified--2026-09-15--ready-for-review)).** **2026-10-08: the current applied release is `d007-v1` (source `bff755f`, A-013; see [deployment.md](deployment.md)). Releases are staged and applied through the scoped, unattended entry point `/usr/local/sbin/sokoladas-deploy` (`status`/`stage`/`release`/`rollback`), with fixes and staging details in [deployment.md](deployment.md#scoped-unattended-deployment-access-2026-10-07-extended-2026-10-07).** No live change is authorized by this document itself.
 
 ## Confirmed application runtime facts
 
@@ -25,6 +25,22 @@ The separate application repository has completed and accepted its initial scaff
 | Access-token secret | application secret is `JWT_ACCESS_SECRET` (supports `JWT_ACCESS_SECRET_FILE`); there is no `session_signing_key` variable in the application |
 
 Real production GHCR image references/digests now exist (first publication 2026-09-15; see "Published application images" below). On 2026-09-15 the application repository built and ran both images locally for `linux/arm64`, then published them via GitHub Actions to GHCR; the published digests were pulled back and re-verified.
+
+### Current applied application images — `d007-v1` (2026-10-08)
+
+The currently deployed release, published by the `Images` workflow (run
+`37687040040`, source commit `bff755fdfe8f17817c9b0028cd0cb71068997d60`, A-013).
+Both digests are `linux/arm64` and carry the source commit as the image revision
+label.
+
+| Image | Reference (immutable) | Platform |
+|---|---|---|
+| Web (`WEB_IMAGE`) | `ghcr.io/marijustechin/smshop-web@sha256:80e61b97c290a470a9e03fef39458466cf98b22815dd2cd743859aa99f79f677` | `linux/arm64` |
+| API (`API_IMAGE`) | `ghcr.io/marijustechin/smshop-api@sha256:401f45c48aba949446099f93d2f653d1498f8fdae1019e280ee8267530a6a64f` | `linux/arm64` |
+
+Applied state is `d007-v1` (`previousReleaseId: d006-v1`); the manifest is
+`deploy/releases/d007-v1.json`. Earlier image sets remain recorded below and in
+[server.md](server.md).
 
 ### Published application images — 2026-09-15
 
@@ -78,7 +94,9 @@ release manifest** (`deploy/releases/<release-id>.json`, non-secret), validates 
 `images.env`; `deploy.sh release <release-id>` then applies it and records
 host-only applied state and deployment evidence (`docs/deployment.md`). The build
 manifest never contains deployment state; applied state and evidence are host-only
-and never committed.
+and never committed. The `deploy` account runs `release` (and, since 2026-10-07,
+`stage`) through the root-owned `/usr/local/sbin/sokoladas-deploy` entry point;
+see `docs/deployment.md`.
 
 ### Reconciled application runtime interface — 2026-09-15
 
@@ -221,7 +239,7 @@ These values are supplied by the application project and are not invented by inf
    password is the next concrete secret (see below); sandbox payment or other
    provider keys remain undefined.
 
-### Staging SMTP enablement (infra wiring prepared 2026-09-18 — not deployed)
+### Staging SMTP enablement (deployed 2026-09-22 — D-004)
 
 The application implements the provider-independent SMTP interface
 (`smshop/docs/email.md`); the real local flow was verified against the
@@ -242,9 +260,9 @@ recovery). The staging infrastructure wiring is prepared in this repository:
 - the security implication is recorded in `docs/deployment.md`: the API gains
   unrestricted outbound Internet (no per-provider allowlist).
 
-Remaining before live email: provide the staging provider values + secret file,
-add the provider's DNS/SPF/DKIM authorization, and deploy under a separate
-authorized task. Tracked in `TODO.md` §7. No SMTP credential value is recorded
+Deployed 2026-09-22 (D-004, `d004-v2`): the provider values and the
+`smtp_password` secret file were provisioned, the Resend domain was verified, and
+the real-email/auth smoke was verified. No SMTP credential value is recorded
 here.
 
 ## Image delivery model (recommended initial)
@@ -256,7 +274,7 @@ here.
 - **Server authentication:** a read-only registry credential (PAT scoped to `packages:read`) used only at pull time and stored host-only, never mounted into containers or committed.
 - **No server builds; no floating tags** (`:latest`) anywhere in the deploy path.
 
-## Compose contract skeleton (proposed — not implemented)
+## Compose contract skeleton (implemented — `deploy/compose.yaml`)
 
 The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](../deploy/compose.yaml) (image references are supplied externally via `images.env` as immutable `@sha256:` digests). The abstract contract:
 
@@ -273,4 +291,4 @@ The concrete infra-side Compose model is prepared in [`../deploy/compose.yaml`](
 - **Release ordering:** DB healthy → run the migration job to exit 0 → start API/frontend → verify the full request path through the proxy.
 - All services inherit the accepted Docker `local` log policy (10m × 3, compressed). No `container_name`, host network, privileged mode, Docker socket, or host PID namespace.
 
-**Infrastructure implementation status (D-002, 2026-09-15):** the `deploy/compose.yaml` env/secret wiring matches the reconciled interface — `api` receives `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with `DB_USER=sokoladas_migration` and `DB_PASSWORD_FILE`; `session_signing_key` was replaced by `jwt_access_secret`; `postgres` is pinned by digest; and `db/init` grants the migration role schema DDL and the runtime role DML only. The first staging deployment is **live and verified** (release `/opt/sokoladas-staging/releases/d002-v1`). **2026-09-22: the manifest-driven D-004 releases and the configuration-only D-005 are deployed and verified; the current applied release is `d005-v1`** (source `64cb8c6`; web `sha256:b6f3936f…`, api `sha256:b5ce59a6…`; Turnstile secret wired via `TURNSTILE_SECRET_KEY_FILE`; SMTP/Resend configured; Google OAuth enabled via `GOOGLE_CLIENT_SECRET_FILE` + host-only `google.env`); see [server.md](server.md#d-005-google-oauth-enabled-verified--2026-09-22--ready-for-review).
+**Infrastructure implementation status (D-002, 2026-09-15):** the `deploy/compose.yaml` env/secret wiring matches the reconciled interface — `api` receives `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER=sokoladas_app` with `DB_PASSWORD_FILE` and `JWT_ACCESS_SECRET_FILE`; `migrate` receives the same components with `DB_USER=sokoladas_migration` and `DB_PASSWORD_FILE`; `session_signing_key` was replaced by `jwt_access_secret`; `postgres` is pinned by digest; and `db/init` grants the migration role schema DDL and the runtime role DML only. The first staging deployment is **live and verified** (release `/opt/sokoladas-staging/releases/d002-v1`). **2026-10-08: the current applied release is `d007-v1`** (source `bff755f`; web `sha256:80e61b97…`, api `sha256:401f45c4…`; Turnstile secret via `TURNSTILE_SECRET_KEY_FILE`; SMTP/Resend; Google OAuth via `GOOGLE_CLIENT_SECRET_FILE` + host-only `google.env`; persistent media via `media_data`/`MEDIA_STORAGE_DIR`). Releases are staged and applied by the `deploy` account through the root-owned `/usr/local/sbin/sokoladas-deploy` entry point; the D-004/D-005/D-006/D-007 record and the unattended staging mechanism are in [deployment.md](deployment.md) and [server.md](server.md).

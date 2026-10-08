@@ -25,8 +25,8 @@ Deployment metadata is prepared in three distinct layers — **desired** release
   optional notes, committing it as `deploy/releases/<release-id>.json`
   (non-secret). `deploy/releases/example-release.json` is an illustrative,
   never-applied example.
-- **Host applied state** — what actually ran on the host (planned `applied.json`
-  in ARCH-004); never committed.
+- **Host applied state** — what actually ran on the host (implemented
+  `applied.json`; ARCH-004); never committed.
 
 `images.env` is generated deterministically from the approved manifest and stays
 host-only/git-ignored:
@@ -114,7 +114,8 @@ staging configuration only.
 
 Transactional email is an approved API outbound integration. The application
 implements the provider-independent SMTP interface (`smshop/docs/email.md`); the
-infrastructure side is prepared here and is **not yet deployed**.
+infrastructure side was deployed with D-004 (`d004-v2`, 2026-09-22; see
+[server.md](server.md)).
 
 - **Nonsecret settings** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
   `MAIL_FROM`) are supplied in `deploy/smtp.env` (host-only, git-ignored; copy
@@ -357,3 +358,5 @@ Still not claimed:
 - Secret recovery custody/rotation.
 
 The live deployment itself was human-executed with interactive sudo; this document records the mechanism and verification, not a standing authorization.
+
+> 2026-10-08 annotation: this D-002 record is historical. Ordinary releases now run through the scoped, root-owned `/usr/local/sbin/sokoladas-deploy` entry point (`stage`/`release`/`rollback`); see "Scoped unattended deployment access" above.
