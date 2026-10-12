@@ -15,6 +15,10 @@ replaced:
   (with `X-Robots-Tag: noindex`). The existing `sokoladas.eu`/`www` servers are
   unchanged; the shared `acme_webroot`/`letsencrypt` volumes issue and renew the
   new certificate through the existing certbot model.
+- The api HTTPS server block is delimited by `# >>> sapiensmetric-review-https >>>`
+  / `# <<< sapiensmetric-review-https <<<` markers so the SapiensMetric installer
+  can render an HTTP-only variant for the first certificate issuance, then install
+  the full config (`nginx -t` before every reload).
 - Validated with `nginx -t` (dummy certificates): syntax and structure are valid.
 
 No live change was made. The template must be **refreshed by an administrator
