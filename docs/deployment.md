@@ -173,6 +173,25 @@ container replacement and redeploys.
   [`deploy/catalog-import/`](../deploy/catalog-import/README.md) (idempotent, slug-keyed);
   media files are copied into the volume with UID 10001 ownership.
 
+## Shared host: SapiensMetric review routing (2026-10-12)
+
+The shared `sokoladas-demo` host also serves a separate SapiensMetric review
+application (SapiensMetric task T-023). This is **additive** to the Sokoladas edge
+and does not change the Sokoladas servers, compose, database or certificates:
+
+- `deploy/proxy/nginx.conf` adds a `sapiensmetric_api` upstream
+  (`sapiensmetric-api:3000`), an HTTP ACME + HTTPS-redirect server for
+  `api.sapiensmetric.eu`, and an HTTPS server that proxies to it. The
+  SapiensMetric API container joins the existing `sokoladas-staging_edge` network;
+  only the proxy still publishes `80`/`443`.
+- The new certificate is issued into the existing `letsencrypt` volume through the
+  existing certbot model (shared `acme_webroot`).
+- Applying the change requires an administrator **template refresh** plus
+  `nginx -t` before reload; repository content alone is not installed state. The
+  application and its own Compose project live in the SapiensMetric repository.
+  See [CHANGELOG](../CHANGELOG.md) (2026-10-12) and the SapiensMetric
+  `deploy/README.md` / `docs/closed-review-deployment.md`.
+
 ## Scoped unattended deployment access (2026-10-07, extended 2026-10-07)
 
 The `deploy` host account no longer has `NOPASSWD:ALL`. It may run only the

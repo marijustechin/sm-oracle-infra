@@ -1,5 +1,31 @@
 # Infrastructure Change Log
 
+## 2026-10-12
+
+### SapiensMetric review routing added to the proxy template (T-023) — Ready for review
+
+Repository-side preparation for a separate SapiensMetric review application hosted
+on the same `sokoladas-demo` host (SapiensMetric task T-023). The authoritative
+proxy template gains **additive-only** routing; no existing configuration is
+replaced:
+
+- `deploy/proxy/nginx.conf`: a `sapiensmetric_api` upstream
+  (`sapiensmetric-api:3000`), an HTTP ACME-challenge + HTTPS-redirect server for
+  `api.sapiensmetric.eu`, and an HTTPS server proxying to the SapiensMetric API
+  (with `X-Robots-Tag: noindex`). The existing `sokoladas.eu`/`www` servers are
+  unchanged; the shared `acme_webroot`/`letsencrypt` volumes issue and renew the
+  new certificate through the existing certbot model.
+- Validated with `nginx -t` (dummy certificates): syntax and structure are valid.
+
+No live change was made. The template must be **refreshed by an administrator
+(root)** and the certificate issued before the routing takes effect; the
+SapiensMetric application and its Compose project live in the separate
+SapiensMetric repository (`deploy/compose.yaml` project `sapiensmetric-review`),
+not here. Sokoladas protection, ordering and rollback are recorded in the
+SapiensMetric task's `docs/closed-review-deployment.md` and `deploy/README.md`.
+
+Ready for review, not Human accepted.
+
 ## 2026-10-08
 
 ### Automatic staging deployment (H-015) — verified — Ready for review
