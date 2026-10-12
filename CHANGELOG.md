@@ -28,6 +28,23 @@ SapiensMetric repository (`deploy/compose.yaml` project `sapiensmetric-review`),
 not here. Sokoladas protection, ordering and rollback are recorded in the
 SapiensMetric task's `docs/closed-review-deployment.md` and `deploy/README.md`.
 
+### SapiensMetric MySQL backup job added (T-023) — Ready for review
+
+A **separate** encrypted off-server backup job for the SapiensMetric stack,
+reusing the existing rclone `crypt` remote with its own path
+(`sapiensmetric-backups/sets`), config, state, log, run lock and systemd timer:
+
+- `backup/sapiensmetric-backup.sh` (`run`/`snapshot`/`status`/`check-remote`/`retention`)
+  — MySQL logical dump + config archive + row-count metadata, upload-verify,
+  and the same retention policy (7 daily + 4 weekly).
+- `backup/systemd/sapiensmetric-backup.{service,timer}` (daily ~03:30
+  Europe/Vilnius) and `backup/sapiensmetric-backup.env.example`.
+- `docs/sapiensmetric-backups.md` — design, install and the **MySQL restore
+  procedure**; `docs/backups.md` now states the scope boundary (the Sokoladas
+  PostgreSQL dump does **not** cover SapiensMetric).
+
+Not executed live; the first scheduled run and a restore test remain unobserved.
+
 Ready for review, not Human accepted.
 
 ## 2026-10-08
