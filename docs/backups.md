@@ -1,5 +1,11 @@
 # Section 8 — Encrypted off-server backups (Google Drive)
 
+> **Scope (2026-10-12):** this document covers the **Sokoladas PostgreSQL** stack.
+> The SapiensMetric closed-review stack uses **MySQL** and has a **separate** job,
+> remote path, retention and restore procedure in
+> [sapiensmetric-backups.md](sapiensmetric-backups.md). The PostgreSQL dump here
+> does **not** preserve SapiensMetric; do not assume one covers the other.
+
 Implementation of automatic, encrypted off-server backups for the
 `sokoladas-demo` deployment at `https://sokoladas.eu`, with a tested restore
 path. Owned by `sm-oracle-infra`; scripts and systemd units live in

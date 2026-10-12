@@ -1,0 +1,15 @@
+[Unit]
+Description=Encrypted off-server backup for the SapiensMetric closed-review stack
+Documentation=https://github.com/marijustechin/sm-oracle-infra/blob/main/docs/sapiensmetric-backups.md
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sapiensmetric-backup run
+# Reads the live MySQL container with --single-transaction only; never mutates it.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=3600
