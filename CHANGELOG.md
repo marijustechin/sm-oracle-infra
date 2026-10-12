@@ -39,6 +39,10 @@ reusing the existing rclone `crypt` remote with its own path
   and the same retention policy (7 daily + 4 weekly).
 - `backup/systemd/sapiensmetric-backup.{service,timer}` (daily ~03:30
   Europe/Vilnius) and `backup/sapiensmetric-backup.env.example`.
+- `backup/sapiensmetric-backup-install.sh` (installs the script, config and
+  units; `--enable-timer`, `--run-now`) and `backup/sapiensmetric-restore-verify.sh`
+  (downloads a set, restores it into an isolated `--network none` MySQL, compares
+  counts to the metadata, cleans up — never touching the live databases).
 - `docs/sapiensmetric-backups.md` — design, install and the **MySQL restore
   procedure**; `docs/backups.md` now states the scope boundary (the Sokoladas
   PostgreSQL dump does **not** cover SapiensMetric).
