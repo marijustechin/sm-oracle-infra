@@ -56,12 +56,19 @@ wrappers and a `visudo`-validated sudoers rule so the agent's SSH account can ru
 
 No `NOPASSWD:ALL`, no shell/installer execution, no Docker-group membership and no
 generic `docker` sudo. The wrappers run with `env -i` and a fixed `PATH`, so paths
-and configuration cannot be overridden by the caller. Revocation:
+and configuration cannot be overridden by the caller.
+
+The scoped operations are `sapiensmetric-maint-check`, `-status`, `-backup`,
+`-restore-verify`, `-api-update` (bounded API image rollout) and
+`-api-role-check` (credential-safe `/auth/me` role check without a rollout).
+
+Revocation — removing maintenance access must **leave scheduled backups enabled**:
 
 ```sh
 sudo rm -f /etc/sudoers.d/sapiensmetric-maintenance
 sudo rm -f /usr/local/sbin/sapiensmetric-maint-*
-sudo systemctl disable --now sapiensmetric-backup.timer
+# Do NOT disable sapiensmetric-backup.timer: backups are independent of the
+# agent's maintenance access and must keep running.
 ```
 
 ## MySQL restore procedure

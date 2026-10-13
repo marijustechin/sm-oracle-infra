@@ -17,8 +17,8 @@
 #
 # Revocation:
 #   sudo rm -f /etc/sudoers.d/sapiensmetric-maintenance
-#   sudo rm -f /usr/local/sbin/sapiensmetric-maint-* 
-#   sudo systemctl disable --now sapiensmetric-backup.timer
+#   sudo rm -f /usr/local/sbin/sapiensmetric-maint-*
+#   (Backups stay enabled by design; do not disable sapiensmetric-backup.timer.)
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,7 +29,7 @@ SECRETS=/etc/sapiensmetric/secrets
 DB_CONTAINER=sapiensmetric-review-db-1
 HOSTENV=/opt/sapiensmetric-review/hostenv
 SUDOERS_FILE=/etc/sudoers.d/sapiensmetric-maintenance
-WRAPPERS=(sapiensmetric-maint-check sapiensmetric-maint-status sapiensmetric-maint-backup sapiensmetric-maint-restore-verify sapiensmetric-maint-api-update)
+WRAPPERS=(sapiensmetric-maint-check sapiensmetric-maint-status sapiensmetric-maint-backup sapiensmetric-maint-restore-verify sapiensmetric-maint-api-update sapiensmetric-maint-api-role-check)
 
 die() { printf 'bootstrap: %s\n' "$*" >&2; exit 1; }
 log() { printf 'bootstrap: %s\n' "$*"; }
@@ -42,6 +42,7 @@ id "$AGENT_USER" >/dev/null 2>&1 || die "agent user not found: $AGENT_USER"
 install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-backup.sh" "$BIN/sapiensmetric-backup"
 install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-restore-verify.sh" "$BIN/sapiensmetric-restore-verify"
 install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-api-update.sh" "$BIN/sapiensmetric-api-update"
+install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-api-role-check.sh" "$BIN/sapiensmetric-api-role-check"
 install -o root -g root -m 0644 "$SRC_DIR/verify-api-role.mjs" "$BIN/verify-api-role.mjs"
 [[ -f "$SRC_DIR/api-image" ]] || die "missing $SRC_DIR/api-image (the reviewed API image digest)"
 install -o root -g root -m 0600 "$SRC_DIR/api-image" /etc/sapiensmetric/api-image
@@ -91,6 +92,7 @@ write_wrapper sapiensmetric-maint-status         "$BIN/sapiensmetric-backup stat
 write_wrapper sapiensmetric-maint-backup         "$BIN/sapiensmetric-backup run"
 write_wrapper sapiensmetric-maint-restore-verify "$BIN/sapiensmetric-restore-verify run"
 write_wrapper sapiensmetric-maint-api-update     "$BIN/sapiensmetric-api-update"
+write_wrapper sapiensmetric-maint-api-role-check "$BIN/sapiensmetric-api-role-check"
 log "installed fixed wrappers: ${WRAPPERS[*]}"
 
 # --- 4. narrowly scoped sudoers (validated before activation) --------------
@@ -127,9 +129,10 @@ The agent ($AGENT_USER) may now run, without a password, ONLY:
   sudo -n $BIN/sapiensmetric-maint-backup
   sudo -n $BIN/sapiensmetric-maint-restore-verify
   sudo -n $BIN/sapiensmetric-maint-api-update
+  sudo -n $BIN/sapiensmetric-maint-api-role-check
 
 Revocation (any time):
   sudo rm -f $SUDOERS_FILE
   sudo rm -f $WRAPPER_PATHS
-  sudo systemctl disable --now sapiensmetric-backup.timer
+  (Scheduled backups are NOT disabled by revocation.)
 EOF
