@@ -29,7 +29,7 @@ SECRETS=/etc/sapiensmetric/secrets
 DB_CONTAINER=sapiensmetric-review-db-1
 HOSTENV=/opt/sapiensmetric-review/hostenv
 SUDOERS_FILE=/etc/sudoers.d/sapiensmetric-maintenance
-WRAPPERS=(sapiensmetric-maint-check sapiensmetric-maint-status sapiensmetric-maint-backup sapiensmetric-maint-restore-verify)
+WRAPPERS=(sapiensmetric-maint-check sapiensmetric-maint-status sapiensmetric-maint-backup sapiensmetric-maint-restore-verify sapiensmetric-maint-api-update)
 
 die() { printf 'bootstrap: %s\n' "$*" >&2; exit 1; }
 log() { printf 'bootstrap: %s\n' "$*"; }
@@ -41,6 +41,10 @@ id "$AGENT_USER" >/dev/null 2>&1 || die "agent user not found: $AGENT_USER"
 # --- 1. scripts, config, systemd -------------------------------------------
 install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-backup.sh" "$BIN/sapiensmetric-backup"
 install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-restore-verify.sh" "$BIN/sapiensmetric-restore-verify"
+install -o root -g root -m 0755 "$SRC_DIR/sapiensmetric-api-update.sh" "$BIN/sapiensmetric-api-update"
+install -o root -g root -m 0644 "$SRC_DIR/verify-api-role.mjs" "$BIN/verify-api-role.mjs"
+[[ -f "$SRC_DIR/api-image" ]] || die "missing $SRC_DIR/api-image (the reviewed API image digest)"
+install -o root -g root -m 0600 "$SRC_DIR/api-image" /etc/sapiensmetric/api-image
 install -d -o root -g root -m 0700 "$CFG_DIR" /opt/sapiensmetric-review/backup /opt/sapiensmetric-review/backup/staging
 if [[ ! -f "$CFG_DIR/backup.env" ]]; then
   install -o root -g root -m 0600 "$SRC_DIR/sapiensmetric-backup.env.example" "$CFG_DIR/backup.env"
@@ -86,6 +90,7 @@ write_wrapper sapiensmetric-maint-check          "$BIN/sapiensmetric-backup chec
 write_wrapper sapiensmetric-maint-status         "$BIN/sapiensmetric-backup status"
 write_wrapper sapiensmetric-maint-backup         "$BIN/sapiensmetric-backup run"
 write_wrapper sapiensmetric-maint-restore-verify "$BIN/sapiensmetric-restore-verify run"
+write_wrapper sapiensmetric-maint-api-update     "$BIN/sapiensmetric-api-update"
 log "installed fixed wrappers: ${WRAPPERS[*]}"
 
 # --- 4. narrowly scoped sudoers (validated before activation) --------------
@@ -121,6 +126,7 @@ The agent ($AGENT_USER) may now run, without a password, ONLY:
   sudo -n $BIN/sapiensmetric-maint-status
   sudo -n $BIN/sapiensmetric-maint-backup
   sudo -n $BIN/sapiensmetric-maint-restore-verify
+  sudo -n $BIN/sapiensmetric-maint-api-update
 
 Revocation (any time):
   sudo rm -f $SUDOERS_FILE

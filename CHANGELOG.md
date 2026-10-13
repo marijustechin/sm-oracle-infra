@@ -2,6 +2,20 @@
 
 ## 2026-10-12
 
+### SapiensMetric scoped API update + role check (T-023) — Ready for review
+
+Added to the one-time maintenance bootstrap (still fixed wrappers only, no
+`NOPASSWD:ALL`, no Docker group, verified environment):
+
+- `backup/sapiensmetric-api-update.sh` + wrapper
+  `sapiensmetric-maint-api-update`: pins the reviewed immutable API image digest
+  from `/etc/sapiensmetric/api-image`, runs the explicit migration, recreates the
+  `api` container, waits for HTTPS readiness, prints the running image digest, and
+  performs a **credential-safe** role-contract check (temporary account via the
+  operator workflow exercised through login + refresh + `/auth/me`, then removed).
+- `backup/verify-api-role.mjs`: prints only HTTP statuses and role values — never
+  passwords, tokens or cookies.
+
 ### SapiensMetric review routing added to the proxy template (T-023) — Ready for review
 
 Repository-side preparation for a separate SapiensMetric review application hosted
