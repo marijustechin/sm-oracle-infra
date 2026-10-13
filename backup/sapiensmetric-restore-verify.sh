@@ -3,35 +3,34 @@
 # isolated temporary MySQL and verify it against the set's own metadata.
 #
 # This NEVER touches the live SapiensMetric or Sokoladas databases, volumes or
-# networks. It:
-#   1. downloads (and decrypts, via the shared rclone `crypt` remote) a set;
-#   2. starts a throwaway MySQL 8.0.46 container on `--network none`
-#      (no outbound, no published ports);
+# networks, and refuses a set that is not marked complete / fails checksums.
+#   1. downloads (decrypts) a set from the shared rclone `crypt` remote;
+#   2. starts a throwaway MySQL 8.0.46 on `--network none` (no ports/outbound),
+#      with a random root password supplied via a mounted file (never argv);
 #   3. loads db.sql.gz into a separate database;
 #   4. compares row counts against the set's metadata.json;
-#   5. writes a verification report and removes only the throwaway container and
+#   5. writes an evidence report and removes only the throwaway container and
 #      temporary directories.
 #
 # Usage:
-#   sapiensmetric-restore-verify run [set-name]     download the newest (or named) set + verify + clean up
+#   sapiensmetric-restore-verify run [set-name]     newest (or named) set + verify + clean up
 #   sapiensmetric-restore-verify verify <local-dir> verify an already-downloaded set
 set -euo pipefail
 
 CONFIG_FILE="${SAPIENSMETRIC_BACKUP_CONFIG:-/etc/sapiensmetric/backup/backup.env}"
 # shellcheck source=/dev/null
-[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+if [[ -f "$CONFIG_FILE" ]]; then source "$CONFIG_FILE"; fi
 
 RCLONE_BIN="${RCLONE_BIN:-rclone}"
 RCLONE_CONFIG="${RCLONE_CONFIG:-/etc/sokoladas-staging/backup/rclone.conf}"
 REMOTE="${REMOTE:-crypt:}"
 SET_PREFIX="${SET_PREFIX:-sapiensmetric-backups/sets}"
-BACKUP_ROOT="${BACKUP_ROOT:-/opt/sapiensmetric-review/backup}"
 WORK_ROOT="${SAPIENSMETRIC_RESTORE_WORK:-/opt/sapiensmetric-review/backup/restore-work}"
 EVIDENCE_ROOT="${SAPIENSMETRIC_RESTORE_EVIDENCE:-/opt/sapiensmetric-review/backup/restore-evidence}"
 MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.0.46}"
 RESTORE_DB="${RESTORE_DB:-sapiensmetric_restore}"
 
-log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H%M%SZ)" "$*" >&2; }
+log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 rclone() { command "$RCLONE_BIN" --config "$RCLONE_CONFIG" "$@"; }
 require_tools() { command -v docker >/dev/null 2>&1 || die "docker not found"; command -v rclone >/dev/null 2>&1 || die "rclone not found"; }
@@ -48,19 +47,26 @@ latest_set() {
     | sed 's:/$::' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z$' | sort | tail -1
 }
 
+# A set is only usable when it carries the COMPLETE marker and its checksums
+# verify. An incomplete/partial set is refused.
 fetch_set() {
   local name="$1" dest="$WORK_ROOT/$name"
   [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z$ ]] || die "invalid set name: $name"
   rm -rf "$dest"; mkdir -p "$dest"
-  rclone lsf "$REMOTE/$SET_PREFIX/$name/COMPLETE" >/dev/null 2>&1 || die "set is not complete: $name"
+  rclone lsf "$REMOTE/$SET_PREFIX/$name/COMPLETE" >/dev/null 2>&1 || die "set is not complete (no COMPLETE marker): $name"
   rclone copy "$REMOTE/$SET_PREFIX/$name" "$dest" --retries 3 --low-level-retries 10 >/dev/null || die "download failed"
+  [[ -f "$dest/sha256sums.txt" ]] || die "downloaded set has no sha256sums.txt"
   ( cd "$dest" && sha256sum -c sha256sums.txt ) >/dev/null || die "downloaded set failed checksum verification"
   printf '%s' "$dest"
 }
 
 verify_set() {
-  local setdir="$1" name ts container work evidence
+  local setdir="$1" name ts container work evidence rootpw
   [[ -f "$setdir/metadata.json" ]] || die "missing metadata.json in $setdir"
+  [[ -f "$setdir/db.sql.gz" ]] || die "missing db.sql.gz in $setdir"
+  [[ -f "$setdir/sha256sums.txt" ]] || die "missing sha256sums.txt in $setdir (incomplete set)"
+  ( cd "$setdir" && sha256sum -c sha256sums.txt ) >/dev/null || die "set failed checksum verification (incomplete/corrupt)"
+
   name="$(basename "$setdir")"
   ts="$(date -u +%Y-%m-%dT%H%M%SZ)"
   work="$(mktemp -d "$WORK_ROOT/verify.XXXXXX")"
@@ -69,23 +75,31 @@ verify_set() {
   container="sapiensmetric-restore-verify-$ts"
   RESTORE_CONTAINER="$container"; RESTORE_WORK="$work"
 
+  # Random throwaway root password, supplied to the container via a mounted file.
+  rootpw="$(openssl rand -hex 16)"
+  printf '%s' "$rootpw" >"$work/root_pw"; chmod 0400 "$work/root_pw"
+  unset rootpw
+
   log "starting isolated MySQL ($MYSQL_IMAGE, --network none)"
   docker run -d --name "$container" --network none \
-    -e MYSQL_ROOT_PASSWORD=restore -e MYSQL_DATABASE="$RESTORE_DB" "$MYSQL_IMAGE" >/dev/null
+    -e MYSQL_ROOT_PASSWORD_FILE=/run/secrets/root_pw -e MYSQL_DATABASE="$RESTORE_DB" \
+    -v "$work/root_pw:/run/secrets/root_pw:ro" "$MYSQL_IMAGE" >/dev/null
   local i
   for i in $(seq 1 60); do
-    docker exec "$container" mysqladmin ping -uroot -prestore --silent >/dev/null 2>&1 && break
+    docker exec "$container" sh -c 'MYSQL_PWD="$(cat /run/secrets/root_pw)" mysql -uroot -e "SELECT 1"' >/dev/null 2>&1 && break
     sleep 2
   done
-  docker exec "$container" mysqladmin ping -uroot -prestore --silent >/dev/null 2>&1 || die "restore database did not become ready"
+  docker exec "$container" sh -c 'MYSQL_PWD="$(cat /run/secrets/root_pw)" mysql -uroot -e "SELECT 1"' >/dev/null 2>&1 \
+    || die "restore database did not become ready"
 
   log "restoring db.sql.gz into database $RESTORE_DB"
-  gunzip -c "$setdir/db.sql.gz" | docker exec -i "$container" sh -c "exec mysql -uroot -prestore '$RESTORE_DB'" \
+  docker exec -i "$container" sh -c 'MYSQL_PWD="$(cat /run/secrets/root_pw)" exec mysql -uroot "$1"' sh "$RESTORE_DB" \
+    < <(gunzip -c "$setdir/db.sql.gz") \
     || die "mysql restore failed"
 
   log "comparing restored counts against the backup metadata"
-  docker exec "$container" mysql -N -B -uroot -prestore "$RESTORE_DB" -e \
-    'SELECT CONCAT("{\"users\": ", (SELECT COUNT(*) FROM users), ", \"assessment_attempts\": ", (SELECT COUNT(*) FROM assessment_attempts), ", \"migrations\": ", (SELECT COUNT(*) FROM migrations), "}");' \
+  docker exec "$container" sh -c 'MYSQL_PWD="$(cat /run/secrets/root_pw)" exec mysql -N -B -uroot "$1" -e "$2"' sh "$RESTORE_DB" \
+    "SELECT JSON_OBJECT('users',(SELECT COUNT(*) FROM users),'assessment_attempts',(SELECT COUNT(*) FROM assessment_attempts),'migrations',(SELECT COUNT(*) FROM migrations));" \
     >"$work/actual.json"
   if python3 - "$setdir/metadata.json" "$work/actual.json" >"$evidence/metadata-diff.txt" 2>&1 <<'PY'
 import json, sys

@@ -33,6 +33,7 @@ suites=(
   "entry point:bash scripts/tests/test_entrypoint.sh"
   "staging:bash scripts/tests/test_stage.sh"
   "backup:bash scripts/tests/test_backup.sh"
+  "sapiensmetric backup:bash scripts/tests/test_sapiensmetric_backup.sh"
   "release manifest resolver:python3 scripts/tests/test_resolve_release_manifest.py"
   "workflow checker fixtures:node --test scripts/ci/check-workflow.test.mjs"
 )

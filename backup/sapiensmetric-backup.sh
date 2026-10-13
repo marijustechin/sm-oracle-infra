@@ -2,36 +2,39 @@
 # sapiensmetric-backup — encrypted off-server backup for the SapiensMetric
 # closed-review stack (T-023).
 #
-# Reuses the EXISTING Sokoladas rclone `crypt` remote (client-side encryption) but
-# writes to a SEPARATE remote path (`sapiensmetric-backups/sets`), with its own
-# config, staging directory, run lock, log, state and systemd timer. It never
-# touches the Sokoladas backup sets, and the Sokoladas PostgreSQL dump does NOT
-# cover SapiensMetric (different engine — MySQL). See docs/sapiensmetric-backups.md.
+# Reuses the EXISTING Sokoladas rclone `crypt` remote but writes to a SEPARATE
+# remote path (`sapiensmetric-backups/sets`), with its own config, staging, run
+# lock, log, state and systemd timer. It never touches the Sokoladas backup sets.
+# The Sokoladas PostgreSQL dump does NOT cover SapiensMetric (MySQL).
 #
-# Runs as root from `sapiensmetric-backup.service`. Nothing secret is printed;
-# the rclone configuration (OAuth token + crypt password) stays in
-# /etc/sokoladas-staging/backup/rclone.conf (root, 0600).
+# Safety properties (T-023 corrections):
+#   * the MySQL dump uses `--single-transaction --quick --skip-lock-tables
+#     --no-tablespaces --skip-triggers` and a SELECT-only restricted account, so
+#     no PROCESS/RELOAD privilege is required;
+#   * the password is never passed on a command line: it is read from a
+#     root-only file and piped to the client via the `MYSQL_PWD` environment;
+#   * a dump/metadata step fails closed on a non-zero exit, ANY stderr output, or
+#     a missing dump-completion marker, so a partial dump is never uploaded or
+#     marked successful.
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
 CONFIG_FILE="${SAPIENSMETRIC_BACKUP_CONFIG:-/etc/sapiensmetric/backup/backup.env}"
 # shellcheck source=/dev/null
-[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+if [[ -f "$CONFIG_FILE" ]]; then source "$CONFIG_FILE"; fi
 
 PROJECT="${PROJECT:-sapiensmetric-review}"
 DB_CONTAINER="${DB_CONTAINER:-sapiensmetric-review-db-1}"
+DB_NAME="${DB_NAME:-sapiensmetric_review}"
+BACKUP_DB_USER="${BACKUP_DB_USER:-sapiensmetric_backup}"
+BACKUP_PASSWORD_FILE="${BACKUP_PASSWORD_FILE:-/etc/sapiensmetric/secrets/sm_backup_password}"
 PROJECT_DIR="${PROJECT_DIR:-/opt/sapiensmetric-review}"
 HOSTENV="${HOSTENV:-$PROJECT_DIR/hostenv}"
 SECRETS_DIR="${SECRETS_DIR:-/etc/sapiensmetric/secrets}"
-INITIAL_DIR="${INITIAL_DIR:-/etc/sapiensmetric/initial-credentials}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/sapiensmetric-review/backup}"
 STAGING_DIR="${STAGING_DIR:-/opt/sapiensmetric-review/backup/staging}"
 LOG_FILE="${LOG_FILE:-/var/log/sapiensmetric-backup.log}"
 RUN_LOCK="${RUN_LOCK:-/run/sapiensmetric-backup.lock}"
 RCLONE_BIN="${RCLONE_BIN:-rclone}"
-# Reuse the Sokoladas rclone crypt remote config; separate destination path.
 RCLONE_CONFIG="${RCLONE_CONFIG:-/etc/sokoladas-staging/backup/rclone.conf}"
 REMOTE="${REMOTE:-crypt:}"
 SET_PREFIX="${SET_PREFIX:-sapiensmetric-backups/sets}"
@@ -56,7 +59,11 @@ log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$LOG_FILE" >&2
 }
 rclone() { command "$RCLONE_BIN" --config "$RCLONE_CONFIG" "$@"; }
-
+require_tools() {
+  command -v docker >/dev/null 2>&1 || die "docker not found"
+  command -v rclone >/dev/null 2>&1 || die "rclone not found"
+  command -v python3 >/dev/null 2>&1 || die "python3 not found"
+}
 usage() {
   cat >&2 <<'USAGE'
 usage: sapiensmetric-backup <command>
@@ -68,7 +75,6 @@ usage: sapiensmetric-backup <command>
   retention      show the retention decision for the remote sets
 USAGE
 }
-
 require_root() { [[ "$(id -u)" -eq 0 ]] || die "must run as root"; }
 
 # --- retention helper (same policy as the Sokoladas job) -------------------
@@ -127,44 +133,83 @@ acquire_lock() {
   exec 7>"$RUN_LOCK"
   flock -n 7 || die "another SapiensMetric backup is already running"
 }
+read_backup_password() {
+  [[ -r "$BACKUP_PASSWORD_FILE" ]] || return 1
+  tr -d '\n' <"$BACKUP_PASSWORD_FILE"
+}
+
+# Run a MySQL query in the db container with the password supplied on STDIN
+# (never a command-line argument) and the SQL passed as a single argument.
+mysql_query() {
+  local sql="$1" user="$2" db="$3" pw
+  pw="$(read_backup_password)" || die "backup password file missing/unreadable: $BACKUP_PASSWORD_FILE"
+  printf '%s\n' "$pw" | docker exec -i "$DB_CONTAINER" sh -c '
+    IFS= read -r MYSQL_PWD || exit 3
+    export MYSQL_PWD
+    exec mysql -N -B -u"$1" "$2" -e "$3"
+  ' sh "$user" "$db" "$sql"
+}
 
 # --- snapshot --------------------------------------------------------------
 read_hostenv() {
   [[ -f "$HOSTENV" ]] || die "hostenv not found: $HOSTENV"
   # shellcheck disable=SC1090
   set -a; . "$HOSTENV"; set +a
-  : "${MYSQL_DATABASE:?hostenv missing MYSQL_DATABASE}"
-  : "${MYSQL_USER:?hostenv missing MYSQL_USER}"
 }
 
 dump_database() {
-  local out="$1"
-  docker exec "$DB_CONTAINER" sh -c \
-    'exec mysqldump --single-transaction --routines --triggers -u"$MYSQL_USER" -p"$(cat /run/secrets/mysql_password)" "$MYSQL_DATABASE"' \
-    | gzip -c >"$out" || die "mysqldump failed"
-  [[ -s "$out" ]] || die "mysqldump produced an empty dump"
+  local out="$1" pw tmp err rc
+  pw="$(read_backup_password)" || die "backup password file missing/unreadable: $BACKUP_PASSWORD_FILE"
+  tmp="$(mktemp "$STAGING_DIR/.dump.XXXXXX")"; err="$(mktemp "$STAGING_DIR/.dumperr.XXXXXX")"
+  set +e
+  printf '%s\n' "$pw" | docker exec -i "$DB_CONTAINER" sh -c '
+    IFS= read -r MYSQL_PWD || exit 3
+    export MYSQL_PWD
+    exec mysqldump --single-transaction --quick --skip-lock-tables --no-tablespaces \
+      --skip-triggers --default-character-set=utf8mb4 -u"$1" "$2"
+  ' sh "$BACKUP_DB_USER" "$DB_NAME" >"$tmp" 2>"$err"
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    local detail; detail="$(head -c 300 "$err")"; rm -f "$tmp" "$err"
+    die "mysqldump failed (exit $rc): ${detail:-no stderr}"
+  fi
+  if [[ -s "$err" ]]; then
+    local detail; detail="$(head -c 300 "$err")"; rm -f "$tmp" "$err"
+    die "mysqldump wrote to stderr (refusing a possibly partial dump): $detail"
+  fi
+  # mysqldump prints this marker only after a complete dump.
+  if ! tail -n 5 "$tmp" | grep -q -- '-- Dump completed'; then
+    rm -f "$tmp" "$err"
+    die "mysqldump output has no completion marker; refusing a partial dump"
+  fi
+  gzip -c "$tmp" >"$out"
+  rm -f "$tmp" "$err"
+  [[ -s "$out" ]] || die "compressed dump is empty"
 }
 
 collect_metadata() {
-  local out="$1"
-  docker exec "$DB_CONTAINER" sh -c \
-    'mysql -N -B -u"$MYSQL_USER" -p"$(cat /run/secrets/mysql_password)" "$MYSQL_DATABASE" -e "
-       SELECT CONCAT(\"{\\\"users\\\": \", (SELECT COUNT(*) FROM users),
-                     \", \\\"assessment_attempts\\\": \", (SELECT COUNT(*) FROM assessment_attempts),
-                     \", \\\"migrations\\\": \", (SELECT COUNT(*) FROM migrations), \"}\");"' \
-    >"$out" || die "metadata query failed"
-  python3 - "$out" <<'PY'
-import json, sys
-path = sys.argv[1]
-open(path, "w").write(json.dumps(json.load(open(path)), indent=2, sort_keys=True) + "\n")
-PY
+  local out="$1" tmp rc
+  tmp="$(mktemp "$STAGING_DIR/.meta.XXXXXX")"
+  set +e
+  mysql_query \
+    "SELECT JSON_OBJECT('users',(SELECT COUNT(*) FROM users),'assessment_attempts',(SELECT COUNT(*) FROM assessment_attempts),'migrations',(SELECT COUNT(*) FROM migrations));" \
+    "$BACKUP_DB_USER" "$DB_NAME" >"$tmp"
+  rc=$?
+  set -e
+  [[ "$rc" -eq 0 ]] || { local raw; raw="$(head -c 300 "$tmp")"; rm -f "$tmp"; die "metadata query failed (exit $rc): ${raw:-no output}"; }
+  if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$tmp"; then
+    local raw; raw="$(head -c 300 "$tmp")"; rm -f "$tmp"
+    die "metadata is not valid JSON: ${raw:-<empty>}"
+  fi
+  mv "$tmp" "$out"
 }
 
 do_snapshot() {
   local setdir="$1"
   mkdir -p "$setdir"; chmod 0700 "$setdir"
 
-  log "dumping MySQL database"
+  log "dumping MySQL database ($DB_NAME as $BACKUP_DB_USER)"
   dump_database "$setdir/db.sql.gz"
 
   log "archiving configuration and host secrets"
@@ -185,6 +230,7 @@ do_snapshot() {
   log "snapshot complete: $setdir"
 }
 
+# --- upload / verify / retention ------------------------------------------
 verify_upload() {
   local setdir="$1" dest="$2" vdir
   vdir="$(mktemp -d "$STAGING_DIR/.verify.XXXXXX")"
@@ -233,8 +279,7 @@ apply_retention() {
 
 # --- commands --------------------------------------------------------------
 cmd_run() {
-  require_root
-  read_hostenv
+  require_root; require_tools
   mkdir -p "$BACKUP_ROOT" "$STAGING_DIR"; chmod 0700 "$BACKUP_ROOT" "$STAGING_DIR"
   acquire_lock
   check_free_space
@@ -251,6 +296,8 @@ cmd_run() {
   name="$(date -u +%Y-%m-%dT%H%M%SZ)"
   setdir="$STAGING_DIR/$name"
   dest="$REMOTE/$SET_PREFIX/$name"
+  # Never leave a partial local set behind on failure.
+  trap 'rm -rf "$setdir"' EXIT
   log "starting SapiensMetric backup set $name"
   do_snapshot "$setdir"
   log "uploading to $dest"
@@ -258,11 +305,27 @@ cmd_run() {
   log "upload verified"
   apply_retention
   rm -rf "$setdir"
+  trap - EXIT
   append_state OK "backup $name uploaded and verified"
   log "backup $name complete"
+  _BACKUP_SUCCESS=1
 }
-cmd_snapshot() { require_root; read_hostenv; mkdir -p "$BACKUP_ROOT" "$STAGING_DIR"; chmod 0700 "$BACKUP_ROOT" "$STAGING_DIR"; acquire_lock; check_free_space; local name setdir; name="$(date -u +%Y-%m-%dT%H%M%SZ)"; setdir="$STAGING_DIR/$name"; do_snapshot "$setdir"; log "snapshot only (not uploaded): $setdir"; }
-cmd_status() { echo "rclone: $("$RCLONE_BIN" version 2>/dev/null | head -1 || echo missing)"; echo "config: $RCLONE_CONFIG ($([[ -f "$RCLONE_CONFIG" ]] && echo present || echo missing))"; echo "remote: $REMOTE"; echo "sets:   $SET_PREFIX"; echo "state:"; [[ -f "$BACKUP_ROOT/state.log" ]] && tail -n 10 "$BACKUP_ROOT/state.log" || echo "  (none)"; }
+cmd_snapshot() {
+  require_root; require_tools
+  mkdir -p "$BACKUP_ROOT" "$STAGING_DIR"; chmod 0700 "$BACKUP_ROOT" "$STAGING_DIR"
+  acquire_lock; check_free_space
+  local name setdir; name="$(date -u +%Y-%m-%dT%H%M%SZ)"; setdir="$STAGING_DIR/$name"
+  do_snapshot "$setdir"
+  log "snapshot only (not uploaded): $setdir"
+}
+cmd_status() {
+  echo "rclone: $("$RCLONE_BIN" version 2>/dev/null | head -1 || echo missing)"
+  echo "config: $RCLONE_CONFIG ($([[ -f "$RCLONE_CONFIG" ]] && echo present || echo missing))"
+  echo "remote: $REMOTE"; echo "sets:   $SET_PREFIX"
+  echo "db:     $DB_CONTAINER / $DB_NAME as $BACKUP_DB_USER"
+  echo "state:"
+  [[ -f "$BACKUP_ROOT/state.log" ]] && tail -n 10 "$BACKUP_ROOT/state.log" || echo "  (none)"
+}
 cmd_check_remote() { remote_ready && { echo "remote OK: $REMOTE"; return 0; }; echo "remote NOT ready"; return 1; }
 cmd_retention() { remote_successful_sets | select_retention "$(date -u +%s)" "$KEEP_DAILY" "$KEEP_WEEKLY"; }
 
