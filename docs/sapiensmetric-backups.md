@@ -38,6 +38,32 @@ sudo /usr/local/sbin/sapiensmetric-backup run
 sudo /usr/local/sbin/sapiensmetric-restore-verify run
 ```
 
+## Scoped maintenance access (T-023)
+
+`backup/bootstrap-sapiensmetric-maintenance.sh` (root, one-time) installs the
+corrected scripts/config/units, creates the SELECT-only `sapiensmetric_backup`
+MySQL account (password in `/etc/sapiensmetric/secrets/sm_backup_password`,
+root `0600`), and enables the timer. It also installs four fixed, argument-less
+wrappers and a `visudo`-validated sudoers rule so the agent's SSH account can run
+**only**:
+
+```text
+/usr/local/sbin/sapiensmetric-maint-check
+/usr/local/sbin/sapiensmetric-maint-status
+/usr/local/sbin/sapiensmetric-maint-backup
+/usr/local/sbin/sapiensmetric-maint-restore-verify
+```
+
+No `NOPASSWD:ALL`, no shell/installer execution, no Docker-group membership and no
+generic `docker` sudo. The wrappers run with `env -i` and a fixed `PATH`, so paths
+and configuration cannot be overridden by the caller. Revocation:
+
+```sh
+sudo rm -f /etc/sudoers.d/sapiensmetric-maintenance
+sudo rm -f /usr/local/sbin/sapiensmetric-maint-*
+sudo systemctl disable --now sapiensmetric-backup.timer
+```
+
 ## MySQL restore procedure
 
 `sapiensmetric-restore-verify` restores a set into a **throwaway** MySQL 8.0.46
